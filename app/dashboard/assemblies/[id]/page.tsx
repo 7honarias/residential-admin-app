@@ -171,8 +171,8 @@ export default function AssemblyRoomPage() {
     }
   };
 
-  const handleConfirmCheckIn = async (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleConfirmCheckIn = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!checkInModalApt) return;
 
     const aptIdToUpdate = checkInModalApt.apartment_id;

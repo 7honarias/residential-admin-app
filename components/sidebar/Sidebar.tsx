@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home, Building2, Coffee, Settings, LogOut, Car, Users } from "lucide-react";
+import { Home, Building2, Coffee, Settings, LogOut, Car, Users, MessageSquare, Bell, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
@@ -15,6 +15,9 @@ const menuItems = [
   { name: "Amenities", icon: Coffee, href: "/dashboard/amenities" },
   { name: "Parqueaderos", icon: Car, href: "/dashboard/parking" },
   { name: "Asambleas", icon: Users, href: "/dashboard/assemblies" },
+  { name: "PQRS", icon: MessageSquare, href: "/dashboard/pqrs" },
+  { name: "Avisos", icon: Bell, href: "/dashboard/notices" },
+  { name: "Paquetes", icon: Package, href: "/dashboard/packages" },
   { name: "Configuración", icon: Settings, href: "/dashboard/settings" },
 
 ];

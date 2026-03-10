@@ -3,6 +3,7 @@ import authReducer from "./slices/authSlice";
 import complexReducer from "./slices/complexSlice";
 import apartmentDetailReducer from "./slices/apartmentDetail.slice";
 import parkingDetailReducer from "./slices/parkingDetail.slice";
+import noticesReducer from "./slices/noticesSlice";
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     complex: complexReducer,    
     apartmentDetail: apartmentDetailReducer,
     parkingDetail: parkingDetailReducer,
+    notices: noticesReducer,
   },
 });
 
