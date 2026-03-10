@@ -9,7 +9,7 @@ import {
   IFetchPackagesResponse,
   IFetchAlertsResponse,
   PackageStatus,
-} from './packages.types';
+} from '@/app/dashboard/packages/packages.types';
 
 // ==================== Packages ====================
 

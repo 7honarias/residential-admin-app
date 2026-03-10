@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAppSelector } from '@/store/hooks';
 import {
   fetchPackages,
@@ -51,81 +51,89 @@ export default function PackagesPage() {
 
   const [error, setError] = useState<string | null>(null);
 
+  // Load packages - wrapped in useCallback
+  const loadPackages = useCallback(
+    async (cursor?: string) => {
+      if (!token || !complexId) return;
+
+      setIsLoadingPackages(true);
+      setError(null);
+
+      try {
+        const response = await fetchPackages({
+          token,
+          complexId,
+          options: {
+            status: packageStatus,
+            limit: 10,
+            cursor,
+          },
+        });
+
+        if (cursor) {
+          if (packageStatus === 'PENDING_PICKUP') {
+            setPendingPackages((prev) => [...prev, ...response.packages]);
+          } else {
+            setDeliveredPackages((prev) => [...prev, ...response.packages]);
+          }
+        } else {
+          if (packageStatus === 'PENDING_PICKUP') {
+            setPendingPackages(response.packages);
+          } else {
+            setDeliveredPackages(response.packages);
+          }
+        }
+
+        setPackageCursor(response.nextCursor);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error loading packages');
+      } finally {
+        setIsLoadingPackages(false);
+      }
+    },
+    [token, complexId, packageStatus]
+  );
+
+  // Load alerts - wrapped in useCallback
+  const loadAlerts = useCallback(
+    async (cursor?: string) => {
+      if (!token || !complexId) return;
+
+      setIsLoadingAlerts(true);
+      setError(null);
+
+      try {
+        const response = await fetchAlerts({
+          token,
+          complexId,
+          options: {
+            limit: 10,
+            cursor,
+          },
+        });
+
+        if (cursor) {
+          setAlerts((prev) => [...prev, ...response.alerts]);
+        } else {
+          setAlerts(response.alerts);
+        }
+
+        setAlertCursor(response.nextCursor);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error loading alerts');
+      } finally {
+        setIsLoadingAlerts(false);
+      }
+    },
+    [token, complexId]
+  );
+
   // Load initial packages
   useEffect(() => {
     if (!token || !complexId) return;
     loadPackages();
     loadAlerts();
-  }, [token, complexId, packageStatus]);
-
-  const loadPackages = async (cursor?: string) => {
-    if (!token || !complexId) return;
-
-    setIsLoadingPackages(true);
-    setError(null);
-
-    try {
-      const response = await fetchPackages({
-        token,
-        complexId,
-        options: {
-          status: packageStatus,
-          limit: 10,
-          cursor,
-        },
-      });
-
-      if (cursor) {
-        if (packageStatus === 'PENDING_PICKUP') {
-          setPendingPackages((prev) => [...prev, ...response.packages]);
-        } else {
-          setDeliveredPackages((prev) => [...prev, ...response.packages]);
-        }
-      } else {
-        if (packageStatus === 'PENDING_PICKUP') {
-          setPendingPackages(response.packages);
-        } else {
-          setDeliveredPackages(response.packages);
-        }
-      }
-
-      setPackageCursor(response.nextCursor);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading packages');
-    } finally {
-      setIsLoadingPackages(false);
-    }
-  };
-
-  const loadAlerts = async (cursor?: string) => {
-    if (!token || !complexId) return;
-
-    setIsLoadingAlerts(true);
-    setError(null);
-
-    try {
-      const response = await fetchAlerts({
-        token,
-        complexId,
-        options: {
-          limit: 10,
-          cursor,
-        },
-      });
-
-      if (cursor) {
-        setAlerts((prev) => [...prev, ...response.alerts]);
-      } else {
-        setAlerts(response.alerts);
-      }
-
-      setAlertCursor(response.nextCursor);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading alerts');
-    } finally {
-      setIsLoadingAlerts(false);
-    }
-  };
+  }, [token, complexId, packageStatus, loadPackages, loadAlerts]);
 
   const handleRegisterPackageSuccess = (newPackage: IPackage) => {
     if (newPackage.status === 'PENDING_PICKUP') {

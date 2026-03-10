@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { IPackage, PackageType } from '../packages.types';
-import { registerPackage } from '../../../services/packages.service';
+import { IPackage, PackageType } from '@/app/dashboard/packages/packages.types';
+import { registerPackage } from '@/services/packages.service';
 
 interface CreatePackageModalProps {
   isOpen: boolean;

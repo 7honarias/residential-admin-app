@@ -1,6 +1,6 @@
 'use client';
 
-import { IQuickAlert } from '../packages.types';
+import { IQuickAlert } from '@/app/dashboard/packages/packages.types';
 
 interface AlertItemProps {
   alert: IQuickAlert;
@@ -37,9 +37,9 @@ export function AlertItem({ alert }: AlertItemProps) {
   };
 
   return (
-    <div className={`rounded-lg p-4 ${alertColors[alert.alert_type]}`}>
+    <div className={`rounded-lg p-4 ${alertColors[alert.alert_type as keyof typeof alertColors]}`}>
       <div className="mb-2 flex items-start justify-between">
-        <h3 className="font-semibold text-gray-900">{alertLabels[alert.alert_type]}</h3>
+        <h3 className="font-semibold text-gray-900">{alertLabels[alert.alert_type as keyof typeof alertLabels]}</h3>
         <span className="text-xs text-gray-600">{formatDate(alert.created_at)}</span>
       </div>
       <p className="mb-2 text-sm text-gray-700">{alert.message}</p>

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { IPackage } from '../packages.types';
-import { deliverPackage } from '../../../services/packages.service';
+import { IPackage } from '@/app/dashboard/packages/packages.types';
+import { deliverPackage } from '@/services/packages.service';
 
 interface DeliverPackageModalProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 'use client';
 
-import { IPackage, PackageStatus } from '../packages.types';
+import { IPackage } from '@/app/dashboard/packages/packages.types';
 
 interface PackageCardProps {
   package: IPackage;
@@ -35,7 +35,7 @@ export function PackageCard({ package: pkg, onDeliver }: PackageCardProps) {
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="mb-3 flex items-start justify-between">
         <div className="flex gap-2">
-          <span className={`inline-block rounded-md px-3 py-1 text-xs font-semibold ${typeColors[pkg.type]}`}>
+          <span className={`inline-block rounded-md px-3 py-1 text-xs font-semibold ${typeColors[pkg.type as keyof typeof typeColors]}`}>
             {pkg.type}
           </span>
           <span className={`inline-block rounded-md px-3 py-1 text-xs font-semibold ${
@@ -43,7 +43,7 @@ export function PackageCard({ package: pkg, onDeliver }: PackageCardProps) {
               ? 'bg-orange-100 text-orange-800'
               : 'bg-green-100 text-green-800'
           }`}>
-            {statusLabels[pkg.status]}
+            {statusLabels[pkg.status as keyof typeof statusLabels]}
           </span>
         </div>
       </div>

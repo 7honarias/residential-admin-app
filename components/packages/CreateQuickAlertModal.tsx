@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertType, IQuickAlert } from '../packages.types';
-import { createQuickAlert } from '../../../services/packages.service';
+import { AlertType, IQuickAlert } from '@/app/dashboard/packages/packages.types';
+import { createQuickAlert } from '@/services/packages.service';
 
 interface CreateQuickAlertModalProps {
   isOpen: boolean;
@@ -119,7 +119,7 @@ export function CreateQuickAlertModal({
             >
               {alertTypes.map((t) => (
                 <option key={t} value={t}>
-                  {alertLabels[t]}
+                  {alertLabels[alertType]}
                 </option>
               ))}
             </select>
@@ -152,7 +152,7 @@ export function CreateQuickAlertModal({
                   name="targetType"
                   value="GLOBAL"
                   checked={targetType === 'GLOBAL'}
-                  onChange={(e) => setTargetType(e.target.value as any)}
+                  onChange={(e) => setTargetType(e.target.value as 'GLOBAL' | 'BLOCK' | 'APARTMENT')}
                   disabled={isLoading}
                   className="mr-2"
                 />
@@ -164,7 +164,7 @@ export function CreateQuickAlertModal({
                   name="targetType"
                   value="BLOCK"
                   checked={targetType === 'BLOCK'}
-                  onChange={(e) => setTargetType(e.target.value as any)}
+                  onChange={(e) => setTargetType(e.target.value as 'GLOBAL' | 'BLOCK' | 'APARTMENT')}
                   disabled={isLoading}
                   className="mr-2"
                 />
@@ -176,7 +176,7 @@ export function CreateQuickAlertModal({
                   name="targetType"
                   value="APARTMENT"
                   checked={targetType === 'APARTMENT'}
-                  onChange={(e) => setTargetType(e.target.value as any)}
+                  onChange={(e) => setTargetType(e.target.value as 'GLOBAL' | 'BLOCK' | 'APARTMENT')}
                   disabled={isLoading}
                   className="mr-2"
                 />
