@@ -25,17 +25,25 @@ export function DeliverPackageModal({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const typeLabels = {
+    BOX: '📦 Caja',
+    ENVELOPE: '✉️ Sobre',
+    FOOD: '🍔 Comida',
+    LAUNDRY: '👕 Lavandería',
+    OTHER: '📋 Otro',
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!pickedUpBy.trim()) {
-      setError('Name of recipient is required');
+        setError('El nombre del destinatario es requerido');
       return;
     }
 
     if (!packageItem) {
-      setError('Package information is missing');
+        setError('La información del paquete está incompleta');
       return;
     }
 
@@ -55,7 +63,7 @@ export function DeliverPackageModal({
       setPickedUpBy('');
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error delivering package');
+        setError(err instanceof Error ? err.message : 'Error al entregar el paquete');
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +74,7 @@ export function DeliverPackageModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-        <h2 className="mb-4 text-xl font-bold">Mark as Delivered</h2>
+        <h2 className="mb-4 text-xl font-bold">Marcar como Entregado</h2>
 
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
@@ -76,15 +84,15 @@ export function DeliverPackageModal({
 
         <div className="mb-4 rounded-md bg-blue-50 p-3">
           <p className="text-sm font-medium text-gray-700">
-            <strong>Apartment:</strong>{' '}
+            <strong>Apartamento:</strong>{' '}
             {packageItem.block_name} - {packageItem.apartment_number}
           </p>
           <p className="text-sm font-medium text-gray-700">
-            <strong>Type:</strong> {packageItem.type}
+            <strong>Tipo:</strong> {typeLabels[packageItem?.type as keyof typeof typeLabels] || packageItem?.type}
           </p>
           {packageItem.carrier && (
             <p className="text-sm font-medium text-gray-700">
-              <strong>Carrier:</strong> {packageItem.carrier}
+              <strong>Transportista:</strong> {packageItem.carrier}
             </p>
           )}
         </div>
@@ -92,11 +100,11 @@ export function DeliverPackageModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Name of recipient *
+              Nombre de quien recibe *
             </label>
             <input
               type="text"
-              placeholder="e.g., Juan Pérez"
+              placeholder="p.ej., Juan Pérez"
               value={pickedUpBy}
               onChange={(e) => setPickedUpBy(e.target.value)}
               className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -113,14 +121,14 @@ export function DeliverPackageModal({
               className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               disabled={isLoading}
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {isLoading ? 'Delivering...' : 'Confirm Delivery'}
+              {isLoading ? 'Marcando...' : 'Marcar Entregado'}
             </button>
           </div>
         </form>

@@ -90,8 +90,8 @@ The project follows a serverless architecture using [AWS (Amazon Web Services)](
 | `block_id` | `uuid` | **Foreign Key** to `blocks.id`. |
 | `number` | `text` | The apartment number. |
 | `floor` | `integer` | The floor the apartment is on. |
+| `coefficient_pricing_id` | `uuid` | **Foreign Key** to `coefficient_pricing.id`. |
 | `created_at`| `timestamp` | Record creation timestamp. |
-| `copropriety_coefficient` | `numeric` | The copropriety coefficient for the apartment. |
 
 ### Table: `assemblies`
 | Column | Type | Description |

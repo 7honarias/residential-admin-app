@@ -16,9 +16,17 @@ export function PackageCard({ package: pkg, onDeliver }: PackageCardProps) {
     OTHER: 'bg-gray-100 text-gray-800',
   };
 
+  const typeLabels = {
+    BOX: '📦 Caja',
+    ENVELOPE: '✉️ Sobre',
+    FOOD: '🍔 Comida',
+    LAUNDRY: '👕 Lavandería',
+    OTHER: '📋 Otro',
+  };
+
   const statusLabels = {
-    PENDING_PICKUP: '⏳ Pending',
-    DELIVERED: '✅ Delivered',
+    PENDING_PICKUP: '⏳ Pendiente',
+    DELIVERED: '✅ Entregado',
   };
 
   const formatDate = (dateString: string) => {
@@ -36,7 +44,7 @@ export function PackageCard({ package: pkg, onDeliver }: PackageCardProps) {
       <div className="mb-3 flex items-start justify-between">
         <div className="flex gap-2">
           <span className={`inline-block rounded-md px-3 py-1 text-xs font-semibold ${typeColors[pkg.type as keyof typeof typeColors]}`}>
-            {pkg.type}
+            {typeLabels[pkg.type as keyof typeof typeLabels]}
           </span>
           <span className={`inline-block rounded-md px-3 py-1 text-xs font-semibold ${
             pkg.status === 'PENDING_PICKUP'
@@ -54,27 +62,27 @@ export function PackageCard({ package: pkg, onDeliver }: PackageCardProps) {
         </p>
         {pkg.carrier && (
           <p className="text-xs text-gray-600">
-            <strong>Carrier:</strong> {pkg.carrier}
+            <strong>Transportista:</strong> {pkg.carrier}
           </p>
         )}
         {pkg.notes && (
           <p className="text-xs text-gray-600">
-            <strong>Notes:</strong> {pkg.notes}
+            <strong>Notas:</strong> {pkg.notes}
           </p>
         )}
       </div>
 
       <div className="mb-3 border-t pt-3 text-xs text-gray-600">
         <p>
-          <strong>Received:</strong> {formatDate(pkg.received_at)}
+          <strong>Recibido:</strong> {formatDate(pkg.received_at)}
         </p>
         {pkg.status === 'DELIVERED' && pkg.picked_up_at && pkg.picked_up_by && (
           <>
             <p>
-              <strong>Delivered:</strong> {formatDate(pkg.picked_up_at)}
+              <strong>Entregado:</strong> {formatDate(pkg.picked_up_at)}
             </p>
             <p>
-              <strong>By:</strong> {pkg.picked_up_by}
+              <strong>Por:</strong> {pkg.picked_up_by}
             </p>
           </>
         )}
@@ -85,7 +93,7 @@ export function PackageCard({ package: pkg, onDeliver }: PackageCardProps) {
           onClick={() => onDeliver(pkg)}
           className="w-full rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
         >
-          Mark as Delivered
+          Marcar Entregado
         </button>
       )}
     </div>

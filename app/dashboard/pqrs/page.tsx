@@ -119,15 +119,15 @@ export default function PqrsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            PQRS - Peticiones, Quejas, Reclamos y Sugerencias
+            PQRS
           </h1>
-          <p className="text-slate-600">
-            Gestiona las solicitudes de la comunidad de manera ordenada y auditable
+          <p className="text-slate-600 text-sm">
+            Peticiones, Quejas, Reclamos y Sugerencias - Gestiona las solicitudes de la comunidad de manera ordenada y auditable
           </p>
         </div>
 

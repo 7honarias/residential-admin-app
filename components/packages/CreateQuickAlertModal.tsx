@@ -11,7 +11,7 @@ interface CreateQuickAlertModalProps {
   token: string;
   complexId: string;
   blocks: Array<{ id: string; name: string }>;
-  apartments: Array<{ id: string; number: string; block_name: string }>;
+  apartments?: Array<{ id: string; number: string; block_name: string }>;
 }
 
 export function CreateQuickAlertModal({
@@ -21,23 +21,19 @@ export function CreateQuickAlertModal({
   token,
   complexId,
   blocks,
-  apartments,
 }: CreateQuickAlertModalProps) {
   const [alertType, setAlertType] = useState<AlertType>('DELIVERY_WAITING');
   const [message, setMessage] = useState('');
-  const [targetType, setTargetType] = useState<'GLOBAL' | 'BLOCK' | 'APARTMENT'>(
-    'GLOBAL'
-  );
+  const [targetType, setTargetType] = useState<'GLOBAL' | 'BLOCK'>('GLOBAL');
   const [targetBlockId, setTargetBlockId] = useState('');
-  const [targetApartmentId, setTargetApartmentId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const alertTypes: AlertType[] = ['UTILITY_CUT', 'BILLS_ARRIVED', 'DELIVERY_WAITING'];
   const alertLabels = {
-    UTILITY_CUT: '🔴 Service Cut',
-    BILLS_ARRIVED: '🟠 Bills Arrived',
-    DELIVERY_WAITING: '🔵 Delivery Waiting',
+    UTILITY_CUT: '🔴 Corte de Servicio',
+    BILLS_ARRIVED: '🟠 Facturas Llegaron',
+    DELIVERY_WAITING: '🔵 Entrega Espera',
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,12 +46,7 @@ export function CreateQuickAlertModal({
     }
 
     if (targetType === 'BLOCK' && !targetBlockId) {
-      setError('Block is required');
-      return;
-    }
-
-    if (targetType === 'APARTMENT' && !targetApartmentId) {
-      setError('Apartment is required');
+      setError('El bloque es requerido');
       return;
     }
 
@@ -66,8 +57,7 @@ export function CreateQuickAlertModal({
         complexId,
         payload: {
           complex_id: complexId,
-          target_apartment_id:
-            targetType === 'APARTMENT' ? targetApartmentId : null,
+          target_apartment_id: null,
           target_block_id: targetType === 'BLOCK' ? targetBlockId : null,
           alert_type: alertType,
           message: message.trim(),
@@ -78,7 +68,7 @@ export function CreateQuickAlertModal({
       resetForm();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error creating alert');
+        setError(err instanceof Error ? err.message : 'Error al crear la alerta');
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +79,6 @@ export function CreateQuickAlertModal({
     setMessage('');
     setTargetType('GLOBAL');
     setTargetBlockId('');
-    setTargetApartmentId('');
     setError(null);
   };
 
@@ -98,7 +87,7 @@ export function CreateQuickAlertModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-        <h2 className="mb-4 text-xl font-bold">Send Quick Alert</h2>
+        <h2 className="mb-4 text-xl font-bold">Enviar Alerta Rápida</h2>
 
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
@@ -110,7 +99,7 @@ export function CreateQuickAlertModal({
           {/* Alert Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Alert Type *
+              Tipo de Alerta *
             </label>
             <select
               value={alertType}
@@ -119,7 +108,7 @@ export function CreateQuickAlertModal({
             >
               {alertTypes.map((t) => (
                 <option key={t} value={t}>
-                  {alertLabels[alertType]}
+                  {alertLabels[t as keyof typeof alertLabels]}
                 </option>
               ))}
             </select>
@@ -128,12 +117,12 @@ export function CreateQuickAlertModal({
           {/* Message */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Message *
+              Mensaje *
             </label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Enter message..."
+              placeholder="Ingresa el mensaje de alerta..."
               rows={4}
               className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               disabled={isLoading}
@@ -143,7 +132,7 @@ export function CreateQuickAlertModal({
           {/* Target Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Recipients *
+              Destinatarios *
             </label>
             <div className="mt-2 space-y-2">
               <label className="flex items-center">
@@ -152,11 +141,11 @@ export function CreateQuickAlertModal({
                   name="targetType"
                   value="GLOBAL"
                   checked={targetType === 'GLOBAL'}
-                  onChange={(e) => setTargetType(e.target.value as 'GLOBAL' | 'BLOCK' | 'APARTMENT')}
+                  onChange={(e) => setTargetType(e.target.value as 'GLOBAL' | 'BLOCK')}
                   disabled={isLoading}
                   className="mr-2"
                 />
-                <span className="text-sm text-gray-700">Everyone (Global)</span>
+                <span className="text-sm text-gray-700">Todos (Global)</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -164,23 +153,11 @@ export function CreateQuickAlertModal({
                   name="targetType"
                   value="BLOCK"
                   checked={targetType === 'BLOCK'}
-                  onChange={(e) => setTargetType(e.target.value as 'GLOBAL' | 'BLOCK' | 'APARTMENT')}
+                  onChange={(e) => setTargetType(e.target.value as 'GLOBAL' | 'BLOCK')}
                   disabled={isLoading}
                   className="mr-2"
                 />
-                <span className="text-sm text-gray-700">By Block/Tower</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="targetType"
-                  value="APARTMENT"
-                  checked={targetType === 'APARTMENT'}
-                  onChange={(e) => setTargetType(e.target.value as 'GLOBAL' | 'BLOCK' | 'APARTMENT')}
-                  disabled={isLoading}
-                  className="mr-2"
-                />
-                <span className="text-sm text-gray-700">Individual Apartment</span>
+                <span className="text-sm text-gray-700">Por Bloque/Torre</span>
               </label>
             </div>
           </div>
@@ -189,7 +166,7 @@ export function CreateQuickAlertModal({
           {targetType === 'BLOCK' && (
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Select Block *
+                Selecciona Bloque *
               </label>
               <select
                 value={targetBlockId}
@@ -197,32 +174,10 @@ export function CreateQuickAlertModal({
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 disabled={isLoading}
               >
-                <option value="">Choose a block...</option>
+                <option value="">Elige un bloque...</option>
                 {blocks.map((block) => (
                   <option key={block.id} value={block.id}>
                     {block.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Apartment Select */}
-          {targetType === 'APARTMENT' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Select Apartment *
-              </label>
-              <select
-                value={targetApartmentId}
-                onChange={(e) => setTargetApartmentId(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                disabled={isLoading}
-              >
-                <option value="">Choose an apartment...</option>
-                {apartments.map((apt) => (
-                  <option key={apt.id} value={apt.id}>
-                    {apt.block_name} - {apt.number}
                   </option>
                 ))}
               </select>
@@ -240,14 +195,14 @@ export function CreateQuickAlertModal({
               className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               disabled={isLoading}
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
-              disabled={isLoading || !message.trim()}
+              disabled={isLoading}
               className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {isLoading ? 'Sending...' : 'Send Alert'}
+              {isLoading ? 'Enviando...' : 'Enviar Alerta'}
             </button>
           </div>
         </form>

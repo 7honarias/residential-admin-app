@@ -70,3 +70,62 @@ export const decodeCursor = (
     return null;
   }
 };
+
+/**
+ * Format a number as currency (USD/COP style)
+ * @param amount - The amount to format
+ * @returns Formatted currency string (e.g., "$1,234.56")
+ */
+export const formatCurrency = (amount: number): string => {
+  try {
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
+  }
+};
+
+/**
+ * Generate unique idempotency key for API requests
+ * Uses UUID v4 with timestamp to ensure uniqueness and reproducibility
+ * @returns Unique idempotency key (UUID v4 format)
+ */
+export const generateIdempotencyKey = (): string => {
+  // Use built-in crypto API (available in modern browsers and Node.js 15+)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback: Generate UUID v4 manually
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+/**
+ * Get idempotency key from sessionStorage or generate a new one
+ * Useful for allowing safe retries of the same request
+ * @param storageKey - Storage key to use
+ * @returns Idempotency key
+ */
+export const getOrGenerateIdempotencyKey = (storageKey: string): string => {
+  if (typeof window === 'undefined') {
+    // Server-side: just generate a new one
+    return generateIdempotencyKey();
+  }
+
+  const stored = sessionStorage.getItem(storageKey);
+  if (stored) {
+    return stored;
+  }
+
+  const newKey = generateIdempotencyKey();
+  sessionStorage.setItem(storageKey, newKey);
+  return newKey;
+};

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User } from "lucide-react";
+import { User, Plus } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
 import { fetchApartments } from "@/services/apartments.service";
 import UploadApartmentsModal from "@/components/apartments/UploadApartmentsModal";
@@ -90,15 +90,15 @@ export default function ApartmentsPage() {
   return (
     <div className="space-y-6">
       {/* 1️⃣ Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-800">
-          Gestión de Apartamentos
-        </h1>
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
+        <h1 className="text-2xl font-bold text-slate-800">Gestión de Apartamentos</h1>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap flex-shrink-0"
         >
-          + Cargar apartments
+          <Plus className="w-5 h-5" />
+          <span className="hidden sm:inline">Cargar apartments</span>
+          <span className="sm:hidden">Cargar</span>
         </button>
       </div>
 

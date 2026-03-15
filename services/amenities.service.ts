@@ -29,7 +29,7 @@ export const upsertAmenity = async (
 ) => {
 
   const url = amenityId
-    ? `${API_URL}/amenities/${amenityId}?complexId=${complexId}`
+    ? `${API_URL}/createUpdateAmenities/${amenityId}?complexId=${complexId}`
     : `${API_URL}/createUpdateAmenities?complexId=${complexId}`;
 
   const method = amenityId ? "PUT" : "POST";

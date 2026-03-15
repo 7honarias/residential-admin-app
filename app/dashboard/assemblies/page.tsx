@@ -130,21 +130,23 @@ export default function AssembliesPage() {
   return (
     <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8 space-y-6">
       {/* HEADER DE LA PÁGINA */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex-1">
           <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
             <Users className="w-8 h-8 text-indigo-600" />
             Asambleas y Votaciones
           </h1>
-          <p className="text-slate-500 font-medium mt-1">
+          <p className="text-slate-500 font-medium mt-1 text-sm">
             Gestiona los eventos, el quórum y las decisiones del conjunto.
           </p>
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all w-full md:w-auto"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all whitespace-nowrap flex-shrink-0"
         >
-          <Plus className="w-5 h-5" /> Nueva Asamblea
+          <Plus className="w-5 h-5" />
+          <span className="hidden sm:inline">Nueva Asamblea</span>
+          <span className="sm:hidden">Nueva</span>
         </button>
       </div>
 

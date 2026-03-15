@@ -114,7 +114,18 @@ export default function AmenityForm({
 
     try {
       setLoading(true);
-      await upsertAmenity(token, complexId, { ...data, schedules }, amenityId);
+      
+      // Asegurar que los valores numéricos se envíen correctamente
+      const payload = {
+        ...data,
+        capacity: parseInt(String(data.capacity), 10),
+        price: parseFloat(String(data.price)) || 0,
+        slot_duration: parseInt(String(data.slot_duration), 10),
+        max_slots_per_reservation: parseInt(String(data.max_slots_per_reservation), 10),
+        schedules,
+      };
+
+      await upsertAmenity(token, complexId, payload, amenityId);
       if (onSuccess) onSuccess();
       if (onFinished) onFinished();
     } catch (err: any) {
@@ -167,7 +178,9 @@ export default function AmenityForm({
             </label>
             <input
               type="number"
-              {...register("capacity", { valueAsNumber: true })}
+              min="1"
+              step="1"
+              {...register("capacity", { valueAsNumber: true, min: 1 })}
               className="w-full px-4 py-3 bg-slate-50 border-transparent border focus:border-blue-500 focus:bg-white rounded-2xl outline-none transition-all font-bold"
             />
           </div>
@@ -246,8 +259,10 @@ export default function AmenityForm({
                 <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-emerald-600">$</span>
                     <input
-                        type="number" step="0.01"
-                        {...register("price", { valueAsNumber: true })}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        {...register("price", { valueAsNumber: true, min: 0 })}
                         className="w-full pl-8 pr-4 py-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-black text-emerald-700"
                     />
                 </div>

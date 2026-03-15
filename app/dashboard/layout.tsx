@@ -2,39 +2,90 @@
 
 import Sidebar from "@/components/sidebar/Sidebar";
 import { useAppSelector } from "@/store/hooks";
-import { useRouter, usePathname } from "next/navigation"; // 👈 Añadir usePathname
-import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Menu } from "lucide-react";
+
+// Mapeo de rutas a títulos (versión corta para móvil)
+const pageTitle: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/dashboard/notices": "Avisos",
+  "/dashboard/pqrs": "PQRS",
+  "/dashboard/finances": "Finanzas",
+  "/dashboard/finances/payments": "Pagos",
+  "/dashboard/apartments": "Apartamentos",
+  "/dashboard/parking": "Parqueaderos",
+  "/dashboard/packages": "Paquetería",
+  "/dashboard/amenities": "Zonas",
+  "/dashboard/assemblies": "Asambleas",
+  "/dashboard/settings": "Configuración",
+};
+
+function getPageTitle(pathname: string): string {
+  // Busca una coincidencia exacta primero
+  if (pageTitle[pathname]) {
+    return pageTitle[pathname];
+  }
+  
+  // Si no, busca una coincidencia con prefijo (para subrutas)
+  for (const [route, title] of Object.entries(pageTitle)) {
+    if (pathname.startsWith(route) && pathname !== "/dashboard") {
+      return title;
+    }
+  }
+  
+  return "AdminResidencial";
+}
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, token } = useAppSelector((state) => state.auth); // 👈 Traemos el token también
+  const { isAuthenticated, token } = useAppSelector((state) => state.auth);
   const router = useRouter();
   const pathname = usePathname();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pageHeading = getPageTitle(pathname);
 
   useEffect(() => {
-    // Solo redirigimos si isAuthenticated es false Y no hay un token en el estado
-    // Esto nos da el margen de espera mientras SessionSync hace su trabajo
     if (!isAuthenticated && !token) {
       const redirectUrl = encodeURIComponent(pathname);
       router.push(`/login?redirectTo=${redirectUrl}`);
     }
   }, [isAuthenticated, token, router, pathname]);
 
-  // ⚡ IMPORTANTE: Si no está autenticado, no renderizamos el contenido.
-  // Esto evita que el usuario vea el Sidebar un milisegundo antes de ser pateado al login.
+  // Cerrar menú cuando cambia de ruta
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
   if (!isAuthenticated) {
-    return null; // O un Spinner de carga
+    return null;
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <section className="p-8 overflow-y-auto">{children}</section>
-      </main>
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Header con botón hamburguesa (solo móvil) */}
+      <header className="lg:hidden flex items-center h-16 bg-white border-b border-gray-200 px-4 z-30">
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title="Abrir menú"
+        >
+          <Menu className="w-6 h-6 text-slate-900" />
+        </button>
+        <span className="ml-3 font-medium text-sm text-slate-900 truncate">{pageHeading}</span>
+      </header>
+
+      {/* Contenido principal */}
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar isMobileOpen={isMobileMenuOpen} onMobileOpenChange={setIsMobileMenuOpen} />
+        <main className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+          <section className="p-4 lg:p-8 overflow-y-auto">{children}</section>
+        </main>
+      </div>
     </div>
   );
 }

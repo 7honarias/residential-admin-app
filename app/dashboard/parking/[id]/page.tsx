@@ -11,6 +11,7 @@ import {
   Plus,
   AlertCircle,
   Loader2,
+  TrendingUp,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useCallback, useEffect, useState } from "react";
@@ -22,6 +23,8 @@ import AssignApartmentModal from "@/components/parkings/AssignApartmentModal";
 import VehicleModal from "@/components/parkings/VehicleModal";
 import { manageParkingAction } from "@/services/parking.service";
 import ChangeTypeModal from "@/components/parkings/ChangeTypeModal";
+import SelectCoefficientModal from "@/components/parkings/SelectCoefficientModal";
+import { CoefficientPricing } from "@/services/settings.service";
 
 export default function ParkingDetailPage() {
   const router = useRouter();
@@ -36,6 +39,7 @@ export default function ParkingDetailPage() {
   const [isEditingVehicle, setIsEditingVehicle] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+  const [isCoefficientModalOpen, setIsCoefficientModalOpen] = useState(false);
   const { data: parking, loading } = useAppSelector(
     (state) => state.parkingDetail,
   );
@@ -43,6 +47,13 @@ export default function ParkingDetailPage() {
   const handleChangeType = async (newType: string) => {
     await handleAction("EDIT_TYPE", newType);
     setIsTypeModalOpen(false);
+  };
+
+  const handleSelectCoefficient = async (coefficient: CoefficientPricing) => {
+    await handleAction("ASSIGN_COEFFICIENT", {
+      coefficient_pricing_id: coefficient.id,
+    });
+    setIsCoefficientModalOpen(false);
   };
 
   const activeComplexId = activeComplex?.id;
@@ -157,14 +168,14 @@ export default function ParkingDetailPage() {
   };
 
   const typeLabel = {
-    RESIDENT: "Residente",
+    PRIVATE: "Privado",
     VISITOR: "Visitante",
     SERVICE: "Servicio",
-    DISABLED: "Discapacitado",
+    DISABLED: "Deshabilitado",
   };
 
   const typeColor = {
-    RESIDENT: "bg-indigo-50 text-indigo-600",
+    PRIVATE: "bg-indigo-50 text-indigo-600",
     VISITOR: "bg-amber-50 text-amber-600",
     SERVICE: "bg-purple-50 text-purple-600",
     DISABLED: "bg-rose-50 text-rose-600",
@@ -202,7 +213,7 @@ export default function ParkingDetailPage() {
                   Espacio #{parking.number}
                 </h1>
                 <p className="text-slate-500 font-medium">
-                  {parking.type === "VISITOR" ? "Visitante" : "Residente"}
+                  {typeLabel[parking.type]}
                 </p>
               </div>
               <div
@@ -374,8 +385,8 @@ export default function ParkingDetailPage() {
               </p>
             </div>
           ) : (
-            /* Caso 2: NO tiene apartamento pero es tipo RESIDENTE */
-            parking.type === "RESIDENT" && (
+            /* Caso 2: NO tiene apartamento pero es tipo PRIVADO */
+            parking.type === "PRIVATE" && (
               <div
                 className={`bg-slate-50 rounded-2xl border-2 border-slate-200 border-dashed p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 ${isProcessing ? "opacity-50" : ""}`}
               >
@@ -387,7 +398,7 @@ export default function ParkingDetailPage() {
                     Parqueadero Libre
                   </h3>
                   <p className="text-[11px] font-medium text-slate-500 mt-1 max-w-[200px]">
-                    Este espacio de residente no tiene un apartamento vinculado.
+                    Este espacio privado no tiene un apartamento vinculado.
                   </p>
                 </div>
                 <button
@@ -421,6 +432,75 @@ export default function ParkingDetailPage() {
               </button>
             </div>
           </div>
+
+          {/* Coefficient Pricing Section */}
+          {!parking.coefficientPricing && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-1">
+                    <TrendingUp className="w-5 h-5 text-purple-600" />
+                    Coeficiente de Precio
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    No hay coeficiente asignado a este parqueadero
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsCoefficientModalOpen(true)}
+                  disabled={isProcessing}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold text-sm disabled:opacity-50"
+                >
+                  Agregar Coeficiente
+                </button>
+              </div>
+            </div>
+          )}
+
+          {parking.coefficientPricing && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                  Coeficiente de Precio
+                </h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                        Coeficiente
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                        Metros
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                        Precio
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-semibold text-slate-800">
+                        {parking.coefficientPricing.coefficient.toFixed(4)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {parking.coefficientPricing.meters} m²
+                      </td>
+                      <td className="px-6 py-4 text-sm font-semibold text-slate-800">
+                        {new Intl.NumberFormat("es-CO", {
+                          style: "currency",
+                          currency: "COP",
+                          minimumFractionDigits: 0,
+                        }).format(parking.coefficientPricing.price)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -451,6 +531,17 @@ export default function ParkingDetailPage() {
           onSave={handleChangeType}
           isProcessing={isProcessing}
           currentType={parking.type}
+        />
+      )}
+
+      {isCoefficientModalOpen && (
+        <SelectCoefficientModal
+          isOpen={isCoefficientModalOpen}
+          onClose={() => setIsCoefficientModalOpen(false)}
+          onSelect={handleSelectCoefficient}
+          token={token!}
+          complexId={activeComplexId!}
+          isProcessing={isProcessing}
         />
       )}
     </div>

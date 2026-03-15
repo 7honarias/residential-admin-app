@@ -113,3 +113,40 @@ export const fetchApartmentDetail = async ({
 
   return res.json();
 };
+
+export interface AssignCoefficientPricingParams {
+  token: string;
+  complexId: string;
+  apartmentId: string;
+  pricingId: string;
+}
+
+/**
+ * Assign a coefficient pricing to an apartment
+ */
+export const assignCoefficientPricingToApartment = async (
+  params: AssignCoefficientPricingParams
+): Promise<void> => {
+  try {
+    const response = await fetch(
+      `${API_URL}/assignCoefficientPricing?complexId=${params.complexId}&apartmentId=${params.apartmentId}&pricingId=${params.pricingId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${params.token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || "Error assigning coefficient pricing to apartment"
+      );
+    }
+  } catch (error) {
+    console.error("Error assigning coefficient pricing:", error);
+    throw error;
+  }
+};

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { IPackage, PackageType } from '@/app/dashboard/packages/packages.types';
 import { registerPackage } from '@/services/packages.service';
+import { fetchApartments } from '@/services/apartments.service';
 
 interface CreatePackageModalProps {
   isOpen: boolean;
@@ -10,7 +11,7 @@ interface CreatePackageModalProps {
   onSuccess: (newPackage: IPackage) => void;
   token: string;
   complexId: string;
-  apartments: Array<{ id: string; number: string; block_name: string }>;
+  blocks?: Array<{ id: string; name: string }>;
 }
 
 export function CreatePackageModal({
@@ -19,30 +20,95 @@ export function CreatePackageModal({
   onSuccess,
   token,
   complexId,
-  apartments,
+  blocks = [],
 }: CreatePackageModalProps) {
   const [type, setType] = useState<PackageType>('BOX');
+  const [selectedBlock, setSelectedBlock] = useState('');
   const [apartmentId, setApartmentId] = useState('');
   const [carrier, setCarrier] = useState('');
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredApartments, setFilteredApartments] = useState<Array<{ id: string; number: string; block_name: string; block_id?: string }>>([]);
+  const [isLoadingApartments, setIsLoadingApartments] = useState(false);
 
   const packageTypes: PackageType[] = ['BOX', 'ENVELOPE', 'FOOD', 'LAUNDRY', 'OTHER'];
 
-  const filteredApartments = apartments.filter(
-    (apt) =>
-      apt.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      apt.block_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const packageTypeLabels = {
+    BOX: '📦 Caja',
+    ENVELOPE: '✉️ Sobre',
+    FOOD: '🍔 Comida',
+    LAUNDRY: '👕 Lavandería',
+    OTHER: '📋 Otro',
+  };
+
+  const resetForm = () => {
+    setType('BOX');
+    setSelectedBlock('');
+    setApartmentId('');
+    setCarrier('');
+    setNotes('');
+    setError(null);
+  };
+
+  // Auto-load first block when modal opens
+  useEffect(() => {
+    if (isOpen && blocks.length > 0) {
+      // Set the first block as selected
+      setSelectedBlock(blocks[0].id);
+      setApartmentId(''); // Reset apartment when opening
+      setError(null);
+    } else if (!isOpen) {
+      // Reset form when modal closes
+      resetForm();
+    }
+  }, [isOpen, blocks]);
+
+  // Fetch apartments for selected block
+  useEffect(() => {
+    if (!selectedBlock || !token || !complexId) {
+      setFilteredApartments([]);
+      return;
+    }
+
+    const loadApartmentsByBlock = async () => {
+      try {
+        setIsLoadingApartments(true);
+        const response = await fetchApartments({
+          token,
+          complexId,
+          blockId: selectedBlock,
+        });
+
+        // Map and filter to only include apartments from this block
+        const blockApartments = (response.apartments || [])
+          .filter(apt => apt.block_name === blocks.find(b => b.id === selectedBlock)?.name)
+          .map((apt) => ({
+            id: apt.id,
+            number: apt.number,
+            block_name: apt.block_name,
+            block_id: selectedBlock,
+          }));
+
+        setFilteredApartments(blockApartments);
+        setApartmentId(''); // Reset apartment selection when block changes
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar los apartamentos');
+        setFilteredApartments([]);
+      } finally {
+        setIsLoadingApartments(false);
+      }
+    };
+
+    loadApartmentsByBlock();
+  }, [selectedBlock, token, complexId, blocks]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!apartmentId.trim()) {
-      setError('Apartment is required');
+        setError('El apartamento es requerido');
       return;
     }
 
@@ -64,19 +130,10 @@ export function CreatePackageModal({
       resetForm();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error registering package');
+        setError(err instanceof Error ? err.message : 'Error al registrar el paquete');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const resetForm = () => {
-    setType('BOX');
-    setApartmentId('');
-    setCarrier('');
-    setNotes('');
-    setSearchTerm('');
-    setError(null);
   };
 
   if (!isOpen) return null;
@@ -84,7 +141,7 @@ export function CreatePackageModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-        <h2 className="mb-4 text-xl font-bold">Register Package</h2>
+        <h2 className="mb-4 text-xl font-bold">Registrar Paquete</h2>
 
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
@@ -96,7 +153,7 @@ export function CreatePackageModal({
           {/* Package Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Package Type *
+              Tipo de Paquete *
             </label>
             <select
               value={type}
@@ -105,48 +162,72 @@ export function CreatePackageModal({
             >
               {packageTypes.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {packageTypeLabels[t as keyof typeof packageTypeLabels]}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Apartment */}
+          {/* Block Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Apartment *
+              Bloque/Torre *
             </label>
-            <input
-              type="text"
-              placeholder="Search apartment..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            />
-            {filteredApartments.length > 0 && (
-              <select
-                value={apartmentId}
-                onChange={(e) => setApartmentId(e.target.value)}
-                className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              >
-                <option value="">Select apartment...</option>
-                {filteredApartments.map((apt) => (
-                  <option key={apt.id} value={apt.id}>
-                    {apt.block_name} - {apt.number}
-                  </option>
-                ))}
-              </select>
-            )}
+            <select
+              value={selectedBlock}
+              onChange={(e) => {
+                setSelectedBlock(e.target.value);
+                setApartmentId(''); // Reset apartment when block changes
+              }}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            >
+              <option value="">Selecciona un bloque...</option>
+              {blocks.map((block) => (
+                <option key={block.id} value={block.id}>
+                  {block.name}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {/* Apartment Selection */}
+          {selectedBlock && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Apartamento *
+              </label>
+              {isLoadingApartments ? (
+                <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                  Cargando apartamentos...
+                </div>
+              ) : (
+                <select
+                  value={apartmentId}
+                  onChange={(e) => setApartmentId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                >
+                  <option value="">Selecciona apartamento...</option>
+                  {filteredApartments.map((apt) => (
+                    <option key={apt.id} value={apt.id}>
+                      Apt {apt.number}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {!isLoadingApartments && filteredApartments.length === 0 && (
+                <p className="mt-1 text-xs text-gray-500">No hay apartamentos en este bloque</p>
+              )}
+            </div>
+          )}
 
           {/* Carrier */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Carrier (optional)
+              Transportista (opcional)
             </label>
             <input
               type="text"
-              placeholder="e.g., FedEx, UPS..."
+              placeholder="p.ej., FedEx, UPS..."
               value={carrier}
               onChange={(e) => setCarrier(e.target.value)}
               className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -156,12 +237,12 @@ export function CreatePackageModal({
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Notes (optional)
+              Notas (opcional)
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional notes..."
+              placeholder="Notas adicionales..."
               rows={3}
               className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
@@ -178,14 +259,14 @@ export function CreatePackageModal({
               className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               disabled={isLoading}
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
               disabled={isLoading}
               className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {isLoading ? 'Registering...' : 'Register'}
+              {isLoading ? 'Registrando...' : 'Registrar'}
             </button>
           </div>
         </form>

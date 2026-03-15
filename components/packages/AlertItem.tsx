@@ -14,9 +14,9 @@ export function AlertItem({ alert }: AlertItemProps) {
   };
 
   const alertLabels = {
-    UTILITY_CUT: '🔴 Service Cut',
-    BILLS_ARRIVED: '🟠 Bills Arrived',
-    DELIVERY_WAITING: '🔵 Delivery Waiting',
+    UTILITY_CUT: '🔴 Corte de Servicio',
+    BILLS_ARRIVED: '🟠 Facturas Llegaron',
+    DELIVERY_WAITING: '🔵 Entrega Espera',
   };
 
   const formatDate = (dateString: string) => {
@@ -31,8 +31,8 @@ export function AlertItem({ alert }: AlertItemProps) {
 
   const getRecipientLabel = () => {
     if (alert.target_name) return alert.target_name;
-    if (alert.target_apartment_id) return 'Individual Apartment';
-    if (alert.target_block_id) return 'Block';
+    if (alert.target_apartment_id) return 'Apartamento Individual';
+    if (alert.target_block_id) return 'Bloque';
     return 'Global';
   };
 
@@ -44,7 +44,7 @@ export function AlertItem({ alert }: AlertItemProps) {
       </div>
       <p className="mb-2 text-sm text-gray-700">{alert.message}</p>
       <p className="text-xs text-gray-600">
-        <strong>Recipients:</strong> {getRecipientLabel()}
+        <strong>Destinatarios:</strong> {getRecipientLabel()}
       </p>
     </div>
   );

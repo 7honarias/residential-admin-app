@@ -39,19 +39,18 @@ export default function NoticesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1">
           <h1 className="text-3xl font-bold text-gray-900">Avisos y Notificaciones</h1>
-          <p className="text-gray-600 mt-1">
-            Crea y gestiona avisos informativos para tu comunidad
-          </p>
+          <p className="text-gray-600 mt-1 text-sm">Crea y gestiona avisos informativos para tu comunidad</p>
         </div>
         <button
           onClick={() => dispatch(openForm())}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-medium"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium whitespace-nowrap flex-shrink-0"
         >
           <Plus className="w-5 h-5" />
-          Nuevo Aviso
+          <span className="hidden sm:inline">Nuevo Aviso</span>
+          <span className="sm:hidden">Agregar</span>
         </button>
       </div>
 

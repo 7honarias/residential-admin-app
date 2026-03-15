@@ -6,6 +6,7 @@ import {
   fetchPackages,
   fetchAlerts,
 } from '@/services/packages.service';
+import { fetchApartments } from '@/services/apartments.service';
 import { IPackage, IQuickAlert, PackageStatus } from './packages.types';
 import { CreatePackageModal } from '@/components/packages/CreatePackageModal';
 import { DeliverPackageModal } from '@/components/packages/DeliverPackageModal';
@@ -13,18 +14,17 @@ import { CreateQuickAlertModal } from '@/components/packages/CreateQuickAlertMod
 import { PackageCard } from '@/components/packages/PackageCard';
 import { AlertItem } from '@/components/packages/AlertItem';
 
-// Mock data - replace with real data from your backend
-const MOCK_APARTMENTS = [
-  { id: 'apt_1', number: '101', block_name: 'Torre A' },
-  { id: 'apt_2', number: '102', block_name: 'Torre A' },
-  { id: 'apt_3', number: '201', block_name: 'Torre B' },
-  { id: 'apt_4', number: '202', block_name: 'Torre B' },
-];
+interface Block {
+  id: string;
+  name: string;
+}
 
-const MOCK_BLOCKS = [
-  { id: 'block_1', name: 'Torre A' },
-  { id: 'block_2', name: 'Torre B' },
-];
+interface Apartment {
+  id: string;
+  number: string;
+  block_name: string;
+  block_id?: string;
+}
 
 export default function PackagesPage() {
   const token = useAppSelector((state) => state.auth.token);
@@ -37,6 +37,10 @@ export default function PackagesPage() {
   const [packageCursor, setPackageCursor] = useState<string | null>(null);
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [packageSearch, setPackageSearch] = useState('');
+
+  // Real apartments and blocks from backend
+  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [blocks, setBlocks] = useState<Block[]>([]);
 
   // Alerts state
   const [alerts, setAlerts] = useState<IQuickAlert[]>([]);
@@ -128,6 +132,46 @@ export default function PackagesPage() {
     [token, complexId]
   );
 
+  // Load blocks and apartments from backend
+  useEffect(() => {
+    if (!token || !complexId) return;
+
+    const loadData = async () => {
+      try {
+        const response = await fetchApartments({
+          token,
+          complexId,
+        });
+
+        // Set blocks data
+        setBlocks(
+          response.blocks.map((block) => ({
+            id: block.id,
+            name: block.name,
+          }))
+        );
+
+        // Set apartments data with block reference
+        setApartments(
+          response.apartments.map((apt) => {
+            // Find the block_id by matching block_name with block name
+            const blockId = response.blocks.find(b => b.name === apt.block_name)?.id || '';
+            return {
+              id: apt.id,
+              number: apt.number,
+              block_name: apt.block_name,
+              block_id: blockId,
+            };
+          })
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error loading apartments');
+      }
+    };
+
+    loadData();
+  }, [token, complexId]);
+
   // Load initial packages
   useEffect(() => {
     if (!token || !complexId) return;
@@ -166,9 +210,9 @@ export default function PackagesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Packages & Alerts</h1>
+          <h1 className="text-3xl font-bold text-gray-900">📦 Paquetes y Alertas</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Manage package deliveries and send quick alerts to residents
+            Gestiona entregas de paquetes y envía alertas rápidas a los residentes
           </p>
         </div>
       </div>
@@ -183,12 +227,12 @@ export default function PackagesPage() {
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">📦 Packages</h2>
+            <h2 className="text-2xl font-bold text-gray-900">📦 Paquetes</h2>
             <button
               onClick={() => setShowCreatePackage(true)}
               className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              + Register Package
+              + Nuevo Paquete
             </button>
           </div>
         </div>
@@ -207,7 +251,7 @@ export default function PackagesPage() {
                   : 'border-transparent text-gray-700 hover:text-gray-900'
               }`}
             >
-              Pending ({pendingPackages.length})
+              Pendientes ({pendingPackages.length})
             </button>
             <button
               onClick={() => {
@@ -220,7 +264,7 @@ export default function PackagesPage() {
                   : 'border-transparent text-gray-700 hover:text-gray-900'
               }`}
             >
-              Delivered ({deliveredPackages.length})
+              Entregados ({deliveredPackages.length})
             </button>
           </div>
         </div>
@@ -229,7 +273,7 @@ export default function PackagesPage() {
         <div className="px-6 py-4 border-b border-gray-200">
           <input
             type="text"
-            placeholder="Search by apartment number..."
+            placeholder="Buscar por número de apartamento..."
             value={packageSearch}
             onChange={(e) => setPackageSearch(e.target.value)}
             className="w-full rounded-md border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -240,7 +284,7 @@ export default function PackagesPage() {
         <div className="px-6 py-6">
           {filteredPackages.length === 0 ? (
             <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
-              <p className="text-sm text-gray-600">No packages to show</p>
+              <p className="text-sm text-gray-600">No hay paquetes para mostrar</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -264,7 +308,7 @@ export default function PackagesPage() {
                 disabled={isLoadingPackages}
                 className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                {isLoadingPackages ? 'Loading...' : 'Load More'}
+                {isLoadingPackages ? 'Cargando...' : 'Cargar Más'}
               </button>
             </div>
           )}
@@ -275,12 +319,12 @@ export default function PackagesPage() {
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">🔔 Quick Alerts</h2>
+            <h2 className="text-xl font-bold text-gray-900">🔔 Alertas Rápidas</h2>
             <button
               onClick={() => setShowCreateAlert(true)}
               className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              + Send Alert
+              + Enviar Alerta
             </button>
           </div>
         </div>
@@ -289,7 +333,7 @@ export default function PackagesPage() {
         <div className="px-6 py-6">
           {alerts.length === 0 ? (
             <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
-              <p className="text-sm text-gray-600">No alerts sent yet</p>
+              <p className="text-sm text-gray-600">No hay alertas enviadas todavía</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -306,7 +350,7 @@ export default function PackagesPage() {
                 disabled={isLoadingAlerts}
                 className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                {isLoadingAlerts ? 'Loading...' : 'Load More'}
+                {isLoadingAlerts ? 'Cargando...' : 'Cargar Más'}
               </button>
             </div>
           )}
@@ -320,7 +364,7 @@ export default function PackagesPage() {
         onSuccess={handleRegisterPackageSuccess}
         token={token!}
         complexId={complexId!}
-        apartments={MOCK_APARTMENTS}
+        blocks={blocks}
       />
 
       <DeliverPackageModal
@@ -341,8 +385,8 @@ export default function PackagesPage() {
         onSuccess={handleCreateAlertSuccess}
         token={token!}
         complexId={complexId!}
-        blocks={MOCK_BLOCKS}
-        apartments={MOCK_APARTMENTS}
+        blocks={blocks}
+        apartments={apartments}
       />
     </div>
   );

@@ -25,6 +25,8 @@ import {
   fetchAmenityBookings,
   updateBookingStatus,
 } from "@/services/bookings.service";
+import { upsertAmenity } from "@/services/amenities.service";
+import EditAmenityModal from "@/components/amenities/EditAmenityModal";
 import { Amenity } from "../amenitie.tyes";
 
 interface Booking {
@@ -99,6 +101,8 @@ export default function AmenityDetailsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const activeComplex = useAppSelector((state) => state.complex.activeComplex);
 
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -164,6 +168,28 @@ export default function AmenityDetailsPage() {
     }
   };
 
+  const handleSaveAmenity = async (updatedAmenity: Amenity) => {
+    setSaving(true);
+    try {
+      const amenityData = {
+        name: updatedAmenity.name,
+        description: updatedAmenity.description,
+        capacity: updatedAmenity.capacity,
+        price: updatedAmenity.price,
+        slot_duration: updatedAmenity.slot_duration,
+        max_slots_per_reservation: updatedAmenity.max_slots_per_reservation,
+      };
+
+      await upsertAmenity(token!, activeComplex!.id, amenityData, amenityId as string);
+      setAmenity(updatedAmenity);
+      console.log("Amenity updated successfully");
+    } catch (err: any) {
+      throw new Error(err.message || "Error al guardar la configuración");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading)
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -202,7 +228,7 @@ export default function AmenityDetailsPage() {
         </div>
 
         <button
-          onClick={() => router.push(`/dashboard/amenities/edit/${amenityId}`)}
+          onClick={() => setEditModalOpen(true)}
           className="flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-600 transition-all shadow-lg"
         >
           <Edit3 className="w-4 h-4" /> Editar Configuración
@@ -464,6 +490,15 @@ export default function AmenityDetailsPage() {
           </section>
         </div>
       </div>
+
+      {/* Modal para editar configuración */}
+      <EditAmenityModal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        amenity={amenity && Object.keys(amenity).length > 0 ? amenity : null}
+        onSave={handleSaveAmenity}
+        isProcessing={saving}
+      />
     </div>
   );
 }

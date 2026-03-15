@@ -43,20 +43,21 @@ export default function AmenitiesPage() {
   }, [token, activeComplex?.id]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-slate-800">Amenities y Áreas Comunes</h1>
-          <p className="text-slate-500 text-sm">Gestiona los espacios y servicios de {activeComplex?.name}</p>
+          <p className="text-slate-500 text-sm mt-1">Gestiona los espacios y servicios de {activeComplex?.name}</p>
         </div>
         
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-semibold shadow-sm"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-semibold shadow-sm whitespace-nowrap flex-shrink-0"
         >
           <Plus className="w-5 h-5" />
-          Nueva Amenity
+          <span className="hidden sm:inline">Nueva Amenity</span>
+          <span className="sm:hidden">Agregar</span>
         </button>
       </div>
 

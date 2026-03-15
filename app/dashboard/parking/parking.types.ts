@@ -14,9 +14,10 @@ export interface Apartment {
 export interface ParkingDetail {
   id: string;
   number: string;
-  type: "RESIDENT" | "VISITOR" | "SERVICE" | "DISABLED";
+  type: "PRIVATE" | "VISITOR" | "SERVICE" | "DISABLED";
   status: "AVAILABLE" | "OCCUPIED" | "MAINTENANCE";
   apartmentNumber?: string;
   vehicle?: Vehicle;
   apartment?: Apartment;
+  coefficientPricing?: import("@/services/settings.service").CoefficientPricing;
 }
