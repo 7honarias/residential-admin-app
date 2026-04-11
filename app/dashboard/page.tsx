@@ -1,26 +1,18 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import Link from "next/link";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useAppSelector } from "@/store/hooks";
-import { useRouter } from "next/navigation";
 import {
   Users,
   Home,
   DollarSign,
   AlertCircle,
-  Calendar,
-  Package,
-  Droplets,
-  ParkingCircle,
-  MessageSquare,
-  ClipboardList,
   TrendingUp,
   TrendingDown,
-  Clock,
-  ArrowRight,
   Activity,
   Download,
-  Plus,
   MapPin,
   Filter,
 } from "lucide-react";
@@ -47,6 +39,7 @@ interface StatCardProps {
   trend?: { value: number; isPositive: boolean } | null;
   color: string;
   loading?: boolean;
+  href?: string;
 }
 
 interface ChartContainerProps {
@@ -72,6 +65,7 @@ const StatCard = ({
   trend,
   color,
   loading,
+  href,
 }: StatCardProps) => {
   if (loading) {
     return (
@@ -86,7 +80,7 @@ const StatCard = ({
     );
   }
 
-  return (
+  const cardContent = (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group">
       <div className="flex justify-between items-start mb-4">
         <div
@@ -115,6 +109,19 @@ const StatCard = ({
       <h3 className="text-2xl font-bold text-slate-900 mt-1">{value}</h3>
     </div>
   );
+
+  if (!href) {
+    return cardContent;
+  }
+
+  return (
+    <Link
+      href={href}
+      className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+    >
+      {cardContent}
+    </Link>
+  );
 };
 
 const ChartContainer = ({
@@ -129,7 +136,7 @@ const ChartContainer = ({
   useEffect(() => {
     if (!containerRef.current) return;
     const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         setWidth(entry.contentRect.width);
       }
     });
@@ -163,7 +170,6 @@ const ChartContainer = ({
 // --- Componente Principal ---
 
 export default function Dashboard() {
-  const router = useRouter();
   const { activeComplex } = useAppSelector((state) => state.complex);
   const { token } = useAppSelector((state) => state.auth);
 
@@ -256,6 +262,7 @@ export default function Dashboard() {
             value={dashboardData?.summary.apartments.value || 0}
             icon={<Home />}
             color="from-blue-500 to-blue-600"
+            href="/dashboard/apartments"
           />
           <StatCard
             label="Residentes"
@@ -263,6 +270,7 @@ export default function Dashboard() {
             value={dashboardData?.summary.residents.value || 0}
             icon={<Users />}
             color="from-indigo-500 to-indigo-600"
+            href="/dashboard/users"
           />
           <StatCard
             label="Ingresos Mes"
@@ -272,6 +280,7 @@ export default function Dashboard() {
             )}
             icon={<DollarSign />}
             color="from-emerald-500 to-emerald-600"
+            href="/dashboard/finances"
           />
           <StatCard
             label="Casos Pendientes"
@@ -279,6 +288,7 @@ export default function Dashboard() {
             value={dashboardData?.summary.pendingCases.value || 0}
             icon={<AlertCircle />}
             color="from-orange-500 to-orange-600"
+            href="/dashboard/pqrs"
           />
         </div>
 

@@ -1,5 +1,4 @@
 import {
-  IInvoicesListResponse,
   IInvoiceDetail,
   IManualPaymentPayload,
   IManualPaymentResponse,
@@ -42,6 +41,16 @@ export interface FetchPaymentListParams {
   token: string;
   complexId: string;
   options?: IPaymentsFilterOptions;
+}
+
+export interface FetchAllPaymentsForExportParams {
+  token: string;
+  complexId: string;
+  options?: Omit<IPaymentsFilterOptions, 'cursor' | 'limit'> & {
+    limitPerPage?: number;
+    maxPages?: number;
+    maxRecords?: number;
+  };
 }
 
 export interface FetchBlocksParams {
@@ -307,6 +316,53 @@ export const fetchPaymentList = async ({
   }
 };
 
+/**
+ * Fetch all payments that match filters, traversing all available pages.
+ * Useful for full-period exports where paginated UI data is not enough.
+ */
+export const fetchAllPaymentsForExport = async ({
+  token,
+  complexId,
+  options = {},
+}: FetchAllPaymentsForExportParams) => {
+  const {
+    limitPerPage = 200,
+    maxPages = 200,
+    maxRecords,
+    ...filters
+  } = options;
+
+  const aggregated: IPaymentsListResponse['payments'] = [];
+  let cursor: string | null = null;
+  let pageCount = 0;
+
+  do {
+    const remainingRecords = maxRecords
+      ? Math.max(maxRecords - aggregated.length, 0)
+      : null;
+
+    if (remainingRecords === 0) {
+      break;
+    }
+
+    const result = await fetchPaymentList({
+      token,
+      complexId,
+      options: {
+        ...filters,
+        limit: remainingRecords ? Math.min(limitPerPage, remainingRecords) : limitPerPage,
+        cursor,
+      },
+    });
+
+    aggregated.push(...result.payments);
+    cursor = result.nextCursor;
+    pageCount += 1;
+  } while (cursor && pageCount < maxPages && (!maxRecords || aggregated.length < maxRecords));
+
+  return maxRecords ? aggregated.slice(0, maxRecords) : aggregated;
+};
+
 // ==================== GET: Blocks (Torres) ====================
 
 /**
@@ -391,4 +447,62 @@ export const fetchApartmentsByBlock = async ({
     console.error('Error en fetchApartmentsByBlock:', error);
     return [];
   }
+};
+
+// ==================== POST: Bulk Create Invoices ====================
+
+export interface BulkInvoiceItem {
+  apartment_number: string;
+  block_name: string;
+  type: string;
+  amount: number;
+  due_date: string; // YYYY-MM-DD
+}
+
+export interface UploadBulkInvoicesParams {
+  token: string;
+  complexId: string;
+  invoices: BulkInvoiceItem[];
+  action?: string;
+}
+
+export interface UploadBulkInvoicesResponse {
+  success: boolean;
+  created: number;
+  errors?: Array<{ row: number; message: string }>;
+  message?: string;
+}
+
+/**
+ * Bulk-create invoices parsed from Excel file
+ * Pattern: POST /uploadInvoicesExcel?complexId=UUID
+ * Body: { action: string, invoices: [...] }
+ */
+export const uploadBulkInvoices = async ({
+  token,
+  complexId,
+  invoices,
+  action = 'BULK_CREATE',
+}: UploadBulkInvoicesParams): Promise<UploadBulkInvoicesResponse> => {
+  const params = new URLSearchParams({ complexId });
+
+  const response = await fetch(`${API_URL}/uploadInvoicesExcel?${params.toString()}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      action,
+      invoices,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error || data?.message || 'Error al crear las facturas');
+  }
+
+  return data as UploadBulkInvoicesResponse;
 };

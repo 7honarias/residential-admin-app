@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -21,9 +21,15 @@ import {
   Trash2,
   Loader2,
   Search,
+  Mic,
+  MicOff,
+  Download,
+  Volume2,
+  Wifi,
 } from "lucide-react";
 
 import CreatePollModal from "@/components/assemblies/CreatePollModal";
+import { supabase } from "@/lib/supabaseClient";
 import { useAppSelector } from "@/store/hooks";
 import {
   fetchAssemblyDetail,
@@ -76,6 +82,23 @@ export default function AssemblyRoomPage() {
   const [proxyId, setProxyId] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState(false);
 
+  // --- ESTADOS DE GRABACIÓN ---
+  type RecordingPhase = "IDLE" | "SOUND_TEST" | "READY" | "RECORDING" | "DONE";
+  const [recordingPhase, setRecordingPhase] = useState<RecordingPhase>("IDLE");
+  const [testAudioUrl, setTestAudioUrl] = useState<string | null>(null);
+  const [recordingAudioUrl, setRecordingAudioUrl] = useState<string | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  // Ref estable a loadData — inicializado sin valor para evitar zona temporal muerta
+  const loadDataRef = useRef<(() => Promise<void>) | undefined>(undefined);
+
+  // --- ESTADOS DE TIEMPO REAL (WebSocket) ---
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [voteFlash, setVoteFlash] = useState(false);
+
   // ==========================================
   // CARGA DE DATOS (Fetch)
   // ==========================================
@@ -118,6 +141,11 @@ export default function AssemblyRoomPage() {
     }
   }, [token, activeComplex, assemblyId]);
 
+  // Mantener loadDataRef siempre apuntando a la versión más reciente de loadData
+  useEffect(() => {
+    loadDataRef.current = loadData;
+  }, [loadData]);
+
   useEffect(() => {
     setIsLoading(true);
     loadData();
@@ -128,6 +156,53 @@ export default function AssemblyRoomPage() {
       loadAttendance();
     }
   }, [activeTab, loadAttendance]);
+
+  // Limpia micrófono y timer si el usuario navega fuera de la página
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  // Suscripción en tiempo real: escucha nuevos votos cuando hay una votación ACTIVA.
+  // Se basa en activePollId (string | null) para que el canal solo se recree cuando
+  // cambia la votación activa — NO en cada actualización de conteos.
+  const activePollId = polls.find((p) => p.status === "ACTIVE")?.id ?? null;
+
+  useEffect(() => {
+    if (!activePollId) {
+      setIsRealtimeConnected(false);
+      return;
+    }
+
+    const channel = supabase
+      .channel(`poll-votes-${activePollId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "poll_votes",
+          filter: `poll_id=eq.${activePollId}`,
+        },
+        () => {
+          setVoteFlash(true);
+          loadDataRef.current?.();
+          setTimeout(() => setVoteFlash(false), 800);
+        },
+      )
+      .subscribe((status) => {
+        console.log(`[Realtime] poll_votes canal status:`, status);
+        setIsRealtimeConnected(status === "SUBSCRIBED");
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      setIsRealtimeConnected(false);
+    };
+  // activePollId es un string simple → el canal solo se recrea cuando cambia la votación activa
+  }, [activePollId]);
 
   if (isLoading || !assembly) {
     return (
@@ -412,6 +487,106 @@ export default function AssemblyRoomPage() {
     }
   };
 
+  // ==========================================
+  // FUNCIONES DE GRABACIÓN
+  // ==========================================
+  const formatSeconds = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    const sec = (s % 60).toString().padStart(2, "0");
+    return `${m}:${sec}`;
+  };
+
+  const startSoundTest = async () => {
+    try {
+      if (testAudioUrl) {
+        URL.revokeObjectURL(testAudioUrl);
+        setTestAudioUrl(null);
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.start(500);
+      setRecordingPhase("SOUND_TEST");
+    } catch {
+      alert("Por favor, permite el acceso al micrófono para hacer la prueba de sonido.");
+    }
+  };
+
+  const stopSoundTest = () => {
+    if (!mediaRecorderRef.current) return;
+    mediaRecorderRef.current.onstop = () => {
+      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const url = URL.createObjectURL(blob);
+      setTestAudioUrl(url);
+      setRecordingPhase("READY");
+    };
+    mediaRecorderRef.current.stop();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.start(1000);
+      setRecordingSeconds(0);
+      setRecordingPhase("RECORDING");
+
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch {
+      alert("No se pudo acceder al micrófono para iniciar la grabación.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (!mediaRecorderRef.current) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+    mediaRecorderRef.current.onstop = () => {
+      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const url = URL.createObjectURL(blob);
+      setRecordingAudioUrl(url);
+      setRecordingPhase("DONE");
+    };
+    mediaRecorderRef.current.stop();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+  };
+
+  const downloadRecording = () => {
+    if (!recordingAudioUrl) return;
+    const link = document.createElement("a");
+    link.href = recordingAudioUrl;
+    const safeName = (assembly?.title ?? assemblyId).replace(/\s+/g, "_");
+    const date = new Date().toISOString().slice(0, 10);
+    link.download = `Asamblea_${safeName}_${date}.webm`;
+    link.click();
+  };
+
+  const resetRecording = () => {
+    if (recordingAudioUrl) URL.revokeObjectURL(recordingAudioUrl);
+    if (testAudioUrl) URL.revokeObjectURL(testAudioUrl);
+    setRecordingPhase("IDLE");
+    setTestAudioUrl(null);
+    setRecordingAudioUrl(null);
+    setRecordingSeconds(0);
+  };
+
   // --- CONFIGURACIÓN VISUAL DEL ESTADO ---
   const statusConfig = {
     SCHEDULED: {
@@ -494,6 +669,16 @@ export default function AssemblyRoomPage() {
             >
               <Users className="w-4 h-4" /> Asistencia
             </button>
+            <button
+              onClick={() => setActiveTab("RECORDING")}
+              className={`pb-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === "RECORDING" ? "border-rose-600 text-rose-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+            >
+              <Mic className="w-4 h-4" />
+              Grabación
+              {recordingPhase === "RECORDING" && (
+                <span className="w-2 h-2 bg-rose-600 rounded-full animate-pulse" />
+              )}
+            </button>
           </div>
 
           {/* --- CONTENIDO DE LAS PESTAÑAS --- */}
@@ -519,7 +704,13 @@ export default function AssemblyRoomPage() {
                 polls.map((poll) => (
                   <div
                     key={poll.id}
-                    className={`bg-white rounded-2xl border overflow-hidden transition-all shadow-sm ${poll.status === "ACTIVE" ? "border-indigo-500 ring-4 ring-indigo-50" : "border-slate-200"}`}
+                    className={`bg-white rounded-2xl border overflow-hidden transition-all duration-300 shadow-sm ${
+                      poll.status === "ACTIVE"
+                        ? voteFlash
+                          ? "border-indigo-500 ring-8 ring-indigo-200"
+                          : "border-indigo-500 ring-4 ring-indigo-50"
+                        : "border-slate-200"
+                    }`}
                   >
                     <div
                       className={`p-5 border-b ${poll.status === "ACTIVE" ? "bg-indigo-50/50 border-indigo-100" : "bg-slate-50/50 border-slate-100"}`}
@@ -542,6 +733,18 @@ export default function AssemblyRoomPage() {
                                   ? "FINALIZADA"
                                   : "BORRADOR"}
                             </span>
+                            {poll.status === "ACTIVE" && (
+                              <span
+                                className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors ${
+                                  isRealtimeConnected
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-slate-100 text-slate-400 animate-pulse"
+                                }`}
+                              >
+                                <Wifi className="w-3 h-3" />
+                                {isRealtimeConnected ? "Tiempo Real" : "Conectando..."}
+                              </span>
+                            )}
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                               <AlertCircle className="w-3 h-3" /> Mayoría{" "}
                               {poll.majority_type === "SIMPLE"
@@ -603,9 +806,11 @@ export default function AssemblyRoomPage() {
                           </div>
                           <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all duration-1000 ${
+                              className={`h-full rounded-full transition-all duration-700 ${
                                 poll.status === "ACTIVE"
-                                  ? "bg-indigo-500"
+                                  ? voteFlash
+                                    ? "bg-indigo-400"
+                                    : "bg-indigo-500"
                                   : option.percentage >= 50
                                     ? "bg-emerald-500"
                                     : "bg-slate-400"
@@ -874,6 +1079,173 @@ export default function AssemblyRoomPage() {
               </div>
             </div>
           )}
+
+          {/* 5. PESTAÑA GRABACIÓN */}
+          {activeTab === "RECORDING" && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+
+              {/* FASE: IDLE — Invitar a hacer prueba de sonido */}
+              {recordingPhase === "IDLE" && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center space-y-5">
+                  <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto">
+                    <Mic className="w-8 h-8 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">Grabación Oficial de la Asamblea</h3>
+                    <p className="text-sm text-slate-500 max-w-md mx-auto">
+                      Antes de iniciar la grabación oficial, realiza una <strong>prueba de sonido</strong> para
+                      verificar que el micrófono funciona correctamente y el audio se escucha con claridad.
+                    </p>
+                  </div>
+                  <button
+                    onClick={startSoundTest}
+                    className="mx-auto flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors"
+                  >
+                    <Volume2 className="w-4 h-4" /> Iniciar Prueba de Sonido
+                  </button>
+                </div>
+              )}
+
+              {/* FASE: SOUND_TEST — Grabando la prueba */}
+              {recordingPhase === "SOUND_TEST" && (
+                <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-10 text-center space-y-5">
+                  <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                    <Mic className="w-8 h-8 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">PRUEBA EN CURSO</p>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">Habla para probar el micrófono</h3>
+                    <p className="text-sm text-slate-500">
+                      Di unas palabras en voz alta. Cuando termines, detén la prueba y escúchate para
+                      confirmar la calidad del audio.
+                    </p>
+                  </div>
+                  <div className="flex justify-center items-end gap-1.5 h-10">
+                    {[10, 22, 34, 18, 28, 14, 30].map((h, i) => (
+                      <div
+                        key={i}
+                        className="w-1.5 bg-amber-400 rounded-full animate-bounce"
+                        style={{ height: `${h}px`, animationDelay: `${i * 0.12}s` }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={stopSoundTest}
+                    className="mx-auto flex items-center gap-2 px-6 py-3 bg-slate-800 text-white font-bold text-sm rounded-xl hover:bg-slate-900 transition-colors"
+                  >
+                    <MicOff className="w-4 h-4" /> Detener Prueba
+                  </button>
+                </div>
+              )}
+
+              {/* FASE: READY — Escuchar prueba y decidir */}
+              {recordingPhase === "READY" && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Prueba Completada</h3>
+                      <p className="text-sm text-slate-500">
+                        Escucha el audio para confirmar la calidad. Si todo suena bien, inicia la grabación oficial.
+                      </p>
+                    </div>
+                  </div>
+
+                  {testAudioUrl && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Audio de prueba</p>
+                      <audio src={testAudioUrl} controls className="w-full rounded-xl" />
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={startSoundTest}
+                      className="flex-1 py-3 border border-slate-200 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 transition-colors flex justify-center items-center gap-2"
+                    >
+                      <Volume2 className="w-4 h-4" /> Repetir Prueba
+                    </button>
+                    <button
+                      onClick={startRecording}
+                      className="flex-1 py-3 bg-rose-600 text-white font-bold text-sm rounded-xl hover:bg-rose-700 transition-colors flex justify-center items-center gap-2"
+                    >
+                      <Mic className="w-4 h-4" /> Iniciar Grabación Oficial
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* FASE: RECORDING — Grabación en progreso con temporizador */}
+              {recordingPhase === "RECORDING" && (
+                <div className="bg-white rounded-2xl border border-rose-200 shadow-sm p-10 text-center space-y-5">
+                  <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                    <Mic className="w-8 h-8 text-rose-600" />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <span className="w-2.5 h-2.5 bg-rose-600 rounded-full animate-pulse" />
+                      <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">GRABANDO</span>
+                    </div>
+                    <p className="text-5xl font-black text-slate-800 tabular-nums tracking-tight">
+                      {formatSeconds(recordingSeconds)}
+                    </p>
+                    <p className="text-sm text-slate-400 mt-2">
+                      El archivo se guardará localmente en tu equipo al detener la grabación.
+                    </p>
+                  </div>
+                  <button
+                    onClick={stopRecording}
+                    className="mx-auto flex items-center gap-2 px-8 py-3.5 bg-slate-800 text-white font-bold text-sm rounded-xl hover:bg-slate-900 transition-colors"
+                  >
+                    <MicOff className="w-4 h-4" /> Detener y Guardar
+                  </button>
+                </div>
+              )}
+
+              {/* FASE: DONE — Descarga disponible */}
+              {recordingPhase === "DONE" && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Grabación Finalizada</h3>
+                      <p className="text-sm text-slate-500">
+                        Duración total:{" "}
+                        <span className="font-bold text-slate-700">{formatSeconds(recordingSeconds)}</span>.
+                        Descarga el archivo para guardarlo permanentemente en tu equipo.
+                      </p>
+                    </div>
+                  </div>
+
+                  {recordingAudioUrl && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Grabación oficial</p>
+                      <audio src={recordingAudioUrl} controls className="w-full rounded-xl" />
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={resetRecording}
+                      className="flex-1 py-3 border border-slate-200 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 transition-colors"
+                    >
+                      Nueva Grabación
+                    </button>
+                    <button
+                      onClick={downloadRecording}
+                      className="flex-1 py-3 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors flex justify-center items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" /> Descargar Audio (.webm)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* COLUMNA DERECHA: ESTADO Y QUÓRUM */}
@@ -1003,7 +1375,7 @@ export default function AssemblyRoomPage() {
               <div className="space-y-4 animate-in slide-in-from-top-2">
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">
-                    Nombre del Apoderado
+                    Nombre
                   </label>
                   <input
                     type="text"
@@ -1016,7 +1388,7 @@ export default function AssemblyRoomPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">
-                    Cédula del Apoderado
+                    Cédula
                   </label>
                   <input
                     type="text"

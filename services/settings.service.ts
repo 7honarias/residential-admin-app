@@ -499,43 +499,6 @@ export const fetchPlaceToPayConfig = async (
   }
 };
 
-/**
- * Update PlaceToPay configuration for a complex
- */
-export const updatePlaceToPayConfig = async (
-  params: UpdatePlaceToPayConfigParams
-): Promise<PlaceToPayConfig | null> => {
-  try {
-    const response = await fetch(
-      `${API_URL}/updatePlaceToPayConfig?complexId=${params.complexId}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${params.token}`,
-        },
-        body: JSON.stringify({
-          merchant_id: params.merchantId,
-          public_key: params.publicKey,
-          private_key: params.privateKey,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.error || "Error updating PlaceToPay config"
-      );
-    }
-
-    const data = await response.json();
-    return data.config;
-  } catch (error) {
-    console.error("Error updating PlaceToPay config:", error);
-    throw error;
-  }
-};
 
 /**
  * ==========================================
@@ -648,6 +611,140 @@ export const updateFinancialSettings = async (
     };
   } catch (error) {
     console.error("Error updating financial settings:", error);
+    throw error;
+  }
+};
+
+/**
+ * ==========================================
+ * BILLING CONFIGURATION
+ * ==========================================
+ */
+
+export type InvoiceGenerationMode = "AUTOMATIC" | "EXCEL_UPLOAD";
+export type PaymentMode = "PAYMENT_GATEWAY" | "REDIRECT_LINK";
+
+export interface BillingConfig {
+  invoiceGenerationMode: InvoiceGenerationMode;
+  paymentMode: PaymentMode;
+  /** Day of month (1-28) on which invoices are auto-generated */
+  invoiceGenerationDay?: number;
+  /** Days after generation day before invoice is considered overdue */
+  paymentDueDays?: number;
+  merchantId?: string;
+  publicKey?: string;
+  privateKey?: string;
+  redirectPaymentUrl?: string;
+}
+
+export interface GetBillingConfigParams {
+  token: string;
+  complexId: string;
+}
+
+export interface UpdateBillingConfigParams extends GetBillingConfigParams {
+  config: BillingConfig;
+}
+
+/**
+ * Fetch billing configuration for a complex
+ */
+export const fetchBillingConfig = async (
+  params: GetBillingConfigParams
+): Promise<BillingConfig | null> => {
+  try {
+    const response = await fetch(
+      `${API_URL}/getBillingConfig?complexId=${params.complexId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${params.token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      console.error("Error fetching billing config:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    if (!data.config) return null;
+
+    return {
+      invoiceGenerationMode: data.config.invoice_generation_mode ?? "AUTOMATIC",
+      paymentMode: data.config.payment_mode ?? "PAYMENT_GATEWAY",
+      invoiceGenerationDay: data.config.invoice_generation_day != null
+        ? Number(data.config.invoice_generation_day)
+        : undefined,
+      paymentDueDays: data.config.payment_due_days != null
+        ? Number(data.config.payment_due_days)
+        : undefined,
+      merchantId: data.config.merchant_id,
+      publicKey: data.config.public_key,
+      privateKey: data.config.private_key,
+      redirectPaymentUrl: data.config.redirect_payment_url,
+    };
+  } catch (error) {
+    console.error("Error fetching billing config:", error);
+    return null;
+  }
+};
+
+/**
+ * Update billing configuration for a complex
+ */
+export const updateBillingConfig = async (
+  params: UpdateBillingConfigParams
+): Promise<BillingConfig | null> => {
+  try {
+    const response = await fetch(
+      `${API_URL}/updateBillingConfig?complexId=${params.complexId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${params.token}`,
+        },
+        body: JSON.stringify({
+          invoice_generation_mode: params.config.invoiceGenerationMode,
+          payment_mode: params.config.paymentMode,
+          invoice_generation_day: params.config.invoiceGenerationDay,
+          payment_due_days: params.config.paymentDueDays,
+          merchant_id: params.config.merchantId,
+          public_key: params.config.publicKey,
+          private_key: params.config.privateKey,
+          redirect_payment_url: params.config.redirectPaymentUrl,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Error updating billing config");
+    }
+
+    const data = await response.json();
+    if (!data.config) return null;
+
+    return {
+      invoiceGenerationMode: data.config.invoice_generation_mode ?? "AUTOMATIC",
+      paymentMode: data.config.payment_mode ?? "PAYMENT_GATEWAY",
+      invoiceGenerationDay: data.config.invoice_generation_day != null
+        ? Number(data.config.invoice_generation_day)
+        : undefined,
+      paymentDueDays: data.config.payment_due_days != null
+        ? Number(data.config.payment_due_days)
+        : undefined,
+      merchantId: data.config.merchant_id,
+      publicKey: data.config.public_key,
+      privateKey: data.config.private_key,
+      redirectPaymentUrl: data.config.redirect_payment_url,
+    };
+  } catch (error) {
+    console.error("Error updating billing config:", error);
     throw error;
   }
 };

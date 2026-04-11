@@ -117,9 +117,17 @@ export default function AmenityDetailsPage() {
 
   // 4. Handlers para cambiar de día
   const nextDay = () =>
-    setSelectedDate((prev) => new Date(prev.setDate(prev.getDate() + 1)));
+    setSelectedDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + 1);
+      return next;
+    });
   const prevDay = () =>
-    setSelectedDate((prev) => new Date(prev.setDate(prev.getDate() - 1)));
+    setSelectedDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() - 1);
+      return next;
+    });
   const goToToday = () => setSelectedDate(new Date());
 
   const fetchData = useCallback(async () => {
@@ -178,6 +186,7 @@ export default function AmenityDetailsPage() {
         price: updatedAmenity.price,
         slot_duration: updatedAmenity.slot_duration,
         max_slots_per_reservation: updatedAmenity.max_slots_per_reservation,
+        schedules: updatedAmenity.amenity_schedules,
       };
 
       await upsertAmenity(token!, activeComplex!.id, amenityData, amenityId as string);
@@ -280,7 +289,14 @@ export default function AmenityDetailsPage() {
                     Duración del Turno
                   </p>
                   <p className="font-bold text-slate-700">
-                    {amenity?.slot_duration || 60} minutos
+                    {(() => {
+                      const mins = amenity?.slot_duration || 60;
+                      if (mins % 60 === 0) {
+                        const hrs = mins / 60;
+                        return `${hrs} ${hrs === 1 ? "hora" : "horas"}`;
+                      }
+                      return `${mins} minutos`;
+                    })()}
                   </p>
                 </div>
               </div>
@@ -305,9 +321,15 @@ export default function AmenityDetailsPage() {
                   <Timer className="w-3.5 h-3.5" />
                   <span>
                     Tiempo máx:{" "}
-                    {(amenity?.slot_duration || 60) *
-                      (amenity?.max_slots_per_reservation || 1)}{" "}
-                    min por reserva
+                    {(() => {
+                      const mins = (amenity?.slot_duration || 60) * (amenity?.max_slots_per_reservation || 1);
+                      if (mins % 60 === 0) {
+                        const hrs = mins / 60;
+                        return `${hrs} ${hrs === 1 ? "hora" : "horas"}`;
+                      }
+                      return `${mins} min`;
+                    })()}{" "}
+                    por reserva
                   </span>
                 </div>
               </div>

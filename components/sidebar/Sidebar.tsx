@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { 
   Home, Building2, Coffee, Settings, LogOut, Car, 
@@ -26,7 +27,9 @@ const menuGroups = [
     label: "Finanzas",
     items: [
       { name: "Facturación y Cartera", icon: DollarSign, href: "/dashboard/finances" },
-      { name: "Historial de Pagos", icon: Receipt, href: "/dashboard/finances/payments" }, 
+      { name: "Historial de Pagos", icon: Receipt, href: "/dashboard/finances/payments" },
+      { name: "Gastos y Egresos", icon: Building2, href: "/dashboard/finances/expenses" },
+      { name: "Directorio de Proveedores", icon: Users, href: "/dashboard/finances/suppliers" },
     ]
   },
   {
@@ -58,14 +61,11 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
   const dispatch = useAppDispatch();
   const { complexes, activeComplex } = useAppSelector((state) => state.complex);
 
-  // Estado para los grupos desplegables (Acordeón)
-  // Iniciamos "Principal" y "Finanzas" abiertos por defecto
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "Principal": true,
     "Finanzas": true,
   });
 
-  // Usa props del layout o estado local como fallback
   const isOpen = isMobileOpen !== undefined ? isMobileOpen : false;
   const setIsOpen = onMobileOpenChange || (() => {});
 
@@ -92,29 +92,46 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
     }
   };
 
+  // 🧠 LA MAGIA UX: Calculamos el link activo más preciso (el de mayor longitud que coincida)
+  const currentActiveHref = useMemo(() => {
+    if (!pathname) return "/dashboard";
+    
+    // 1. Extraemos todas las URLs del menú
+    const allLinks = menuGroups.flatMap(g => g.items.map(i => i.href));
+    
+    // 2. Filtramos las que coincidan y las ordenamos por longitud descendente
+    const bestMatch = allLinks
+      .filter(href => pathname === href || pathname.startsWith(`${href}/`))
+      .sort((a, b) => b.length - a.length)[0];
+
+    return bestMatch || "/dashboard";
+  }, [pathname]);
+
   return (
     <>
-      {/* --- FONDO OSCURO (OVERLAY) PARA MÓVIL --- */}
-      {/* Oscurece el resto de la pantalla cuando el menú está abierto */}
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 top-16 bg-black/50 z-30 backdrop-blur-sm transition-opacity"
+          className="lg:hidden fixed inset-0 top-16 bg-slate-900/60 z-30 backdrop-blur-sm transition-opacity"
           onClick={() => setIsOpen(false)}
         />
       )}
 
-      {/* --- SIDEBAR PRINCIPAL --- */}
-      {/* Usa fixed en ambos casos para mantenerlo siempre visible. Se oculta con -translate-x-full en móvil si está cerrado */}
       <aside
-        className={`w-64 bg-slate-900 text-white h-screen flex flex-col fixed top-16 lg:top-0 left-0 z-40 lg:z-20 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none ${
+        className={`w-64 bg-slate-900 text-slate-300 h-screen flex flex-col fixed top-16 lg:top-0 left-0 z-40 lg:z-20 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none ${
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        {/* Header con botón para cerrar (X) en móvil */}
-        <div className="p-6 text-xl font-bold border-b border-slate-800 shrink-0 flex justify-between items-center">
-          <span className="truncate">AdminResidencial</span>
+        <div className="p-6 text-xl font-bold border-b border-slate-800 shrink-0 flex justify-between items-center text-white">
+          <Image
+            src="/logo-web-transparent.png"
+            alt="AdminResidencial"
+            width={200}
+            height={56}
+            className="h-10 w-auto object-contain"
+            priority
+          />
           <button 
-            className="lg:hidden text-slate-400 hover:text-white p-1"
+            className="lg:hidden text-slate-400 hover:text-white p-1 transition-colors"
             onClick={() => setIsOpen(false)}
           >
             <X className="w-6 h-6" />
@@ -125,7 +142,7 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
           <select
             value={activeComplex?.id || ""}
             onChange={handleChange}
-            className="w-full p-2.5 rounded bg-slate-800 text-sm text-white border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-2.5 rounded-lg bg-slate-800 text-sm font-medium text-white border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow cursor-pointer appearance-none"
           >
             <option value="">Seleccionar Conjunto</option>
             {complexes.map((complex) => (
@@ -136,15 +153,13 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
           </select>
         </div>
 
-        {/* Navegación con Acordeones */}
         <nav className="flex-1 px-4 overflow-y-auto custom-scrollbar">
           {menuGroups.map((group) => (
             <div key={group.label} className="mb-2">
               
-              {/* Botón que despliega/oculta el grupo */}
               <button
                 onClick={() => toggleGroup(group.label)}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider hover:text-slate-200 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-widest hover:text-slate-300 transition-colors"
               >
                 <span>{group.label}</span>
                 {openGroups[group.label] ? (
@@ -154,7 +169,6 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
                 )}
               </button>
 
-              {/* Contenedor animado de los enlaces */}
               <div
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${
                   openGroups[group.label] ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0"
@@ -162,20 +176,22 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
               >
                 <ul className="space-y-1">
                   {group.items.map((item) => {
-                    const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                    // 👇 Aquí aplicamos la nueva validación estricta
+                    const isActive = item.href === currentActiveHref;
+                    
                     return (
                       <li key={item.name}>
                         <Link
                           href={item.href}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group ${
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
                             isActive
-                              ? "bg-blue-600/10 text-blue-400 font-medium"
-                              : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                              ? "bg-blue-600/15 text-blue-400 font-semibold shadow-inner"
+                              : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                           }`}
                         >
                           <item.icon
                             className={`w-5 h-5 transition-colors ${
-                              isActive ? "text-blue-400" : "text-slate-400 group-hover:text-white"
+                              isActive ? "text-blue-400" : "text-slate-500 group-hover:text-white"
                             }`}
                           />
                           <span className="truncate">{item.name}</span>
@@ -192,7 +208,7 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
         <div className="mt-auto p-4 border-t border-slate-800 shrink-0 bg-slate-900">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-300 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg font-medium text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
           >
             <LogOut className="w-5 h-5" />
             <span>Cerrar sesión</span>

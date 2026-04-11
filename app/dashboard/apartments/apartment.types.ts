@@ -1,6 +1,8 @@
 export interface Owner {
   id?: string;
   fullName: string;
+  documentType: string;
+  documentNumber: string;
   email: string | null;
   phone: string;
 }
@@ -8,6 +10,8 @@ export interface Owner {
 export interface OwnerForm {
   id?: string;
   fullName: string;
+  documentType: string;
+  documentNumber: string;
   email: string;
   confirmEmail: string;
   phone: string;
@@ -16,6 +20,8 @@ export interface OwnerForm {
 export interface ResidentForm {
   id?: string;
   fullName: string;
+  documentTypeCode: string;
+  documentNumber: string;
   email: string;
   confirmEmail: string;
   phone: string;
@@ -24,6 +30,8 @@ export interface ResidentForm {
 export interface Resident {
   id: string;
   fullName: string;
+  documentTypeCode: string;
+  documentNumber: string;
   email: string;
   phone: string;
 }

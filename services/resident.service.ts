@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 
 export const addResident = async (
-  form: { fullName: string; email: string; phone: string },
+  form: { fullName: string; documentTypeCode: string; documentNumber: string; email: string; phone: string },
   complexId: string,
   apartmentId: string
 ) => {
@@ -34,7 +34,8 @@ export const addResident = async (
 export const removeResident = async (
   profileId: string,
   complexId: string,
-  apartmentId: string
+  apartmentId: string,
+  role: string
 ) => {
   // 1. Obtener la sesión para el token
   const { data: { session } } = await supabase.auth.getSession();
@@ -58,6 +59,7 @@ export const removeResident = async (
       body: JSON.stringify({
         apartmentId,
         profileId,
+        role,
       }),
     }
   );

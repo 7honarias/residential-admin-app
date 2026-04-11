@@ -2,32 +2,30 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAppSelector } from "@/store/hooks";
-import { AlertCircle, Save, Loader, Settings, CreditCard, DollarSign } from "lucide-react";
+import { AlertCircle, Save, Loader, Settings, Receipt } from "lucide-react";
 import CoefficientPricingTable from "@/components/settings/CoefficientPricingTable";
-import PlaceToPayConfigForm from "@/components/settings/PlaceToPayConfigForm";
-import FinancialSettingsForm from "@/components/settings/FinancialSettingsForm"; // <-- NUEVO COMPONENTE
+import FinancialSettingsForm from "@/components/settings/FinancialSettingsForm";
+import BillingConfigForm, { BillingConfig as BillingConfigFormData } from "@/components/settings/BillingConfigForm";
 import {
-  fetchPlaceToPayConfig,
-  updatePlaceToPayConfig,
-  PlaceToPayConfig,
-  fetchFinancialSettings,     // <-- NUEVAS FUNCIONES EN TU SERVICIO
-  updateFinancialSettings,    // <-- NUEVAS FUNCIONES EN TU SERVICIO
-  FinancialSettings,          // <-- NUEVA INTERFAZ EN TU SERVICIO
+  fetchFinancialSettings,
+  updateFinancialSettings,
+  FinancialSettings,
+  fetchBillingConfig,
+  updateBillingConfig,
+  BillingConfig,
 } from "@/services/settings.service";
 
-// 1. Agregamos el nuevo Tab "finances"
-type ActiveTab = "administration" | "placetopay" | "finances";
+type ActiveTab = "administration" | "billing";
 
 export default function SettingsPage() {
   const { activeComplex } = useAppSelector((state) => state.complex);
   const { token } = useAppSelector((state) => state.auth);
   
   const [activeTab, setActiveTab] = useState<ActiveTab>("administration");
-  const [placeToPayConfig, setPlaceToPayConfig] = useState<PlaceToPayConfig | null>(null);
   
-  // 2. Estado para la nueva configuración financiera
   const [financialSettings, setFinancialSettings] = useState<FinancialSettings | null>(null);
-  
+  const [billingConfig, setBillingConfig] = useState<BillingConfig | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,19 +38,13 @@ export default function SettingsPage() {
       setLoading(true);
       setError(null);
 
-      if (activeTab === "placetopay") {
-        const config = await fetchPlaceToPayConfig({
-          token,
-          complexId: activeComplex.id,
-        });
-        setPlaceToPayConfig(config);
-      } else if (activeTab === "finances") {
-        // Cargar la configuración financiera
-        const config = await fetchFinancialSettings({
-          token,
-          complexId: activeComplex.id,
-        });
-        setFinancialSettings(config);
+      if (activeTab === "billing") {
+        const [financialData, billingData] = await Promise.all([
+          fetchFinancialSettings({ token, complexId: activeComplex.id }),
+          fetchBillingConfig({ token, complexId: activeComplex.id }),
+        ]);
+        setFinancialSettings(financialData);
+        setBillingConfig(billingData);
       }
     } catch (err) {
       setError(
@@ -67,39 +59,28 @@ export default function SettingsPage() {
     loadConfiguration();
   }, [loadConfiguration]);
 
-  const handleSavePlaceToPayConfig = async (config: {
-    merchantId: string;
-    publicKey: string;
-    privateKey: string;
-  }) => {
-    if (!activeComplex?.id || !token) return;
 
+  const handleSaveBillingConfig = async (config: BillingConfigFormData) => {
+    if (!activeComplex?.id || !token) return;
     try {
       setSaving(true);
       setError(null);
       setSuccess(null);
-
-      const updatedConfig = await updatePlaceToPayConfig({
+      const updated = await updateBillingConfig({
         token,
         complexId: activeComplex.id,
-        merchantId: config.merchantId,
-        publicKey: config.publicKey,
-        privateKey: config.privateKey,
+        config,
       });
-
-      if (updatedConfig) {
-        setPlaceToPayConfig(updatedConfig);
-        setSuccess("Credenciales de PlaceToPay guardadas correctamente");
-        setTimeout(() => setSuccess(null), 3000);
-      }
+      if (updated) setBillingConfig(updated);
+      setSuccess("Configuración de facturación guardada correctamente");
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error saving PlaceToPay configuration");
+      setError(err instanceof Error ? err.message : "Error guardando configuración de facturación");
     } finally {
       setSaving(false);
     }
   };
 
-  // 3. Función para guardar la configuración financiera
   const handleSaveFinancialSettings = async (config: {
     interestType: "PERCENTAGE" | "FIXED_AMOUNT";
     interestRate: number;
@@ -173,37 +154,21 @@ export default function SettingsPage() {
             Administración
           </button>
           
-          {/* NUEVO TAB: FINANZAS E INTERESES */}
+          {/* TAB: FACTURACIÓN */}
           <button
             onClick={() => {
-              setActiveTab("finances");
+              setActiveTab("billing");
               setError(null);
               setSuccess(null);
             }}
             className={`flex items-center gap-2 px-6 py-4 font-medium border-b-2 transition-colors ${
-              activeTab === "finances"
+              activeTab === "billing"
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
-            <DollarSign className="w-5 h-5" />
-            Políticas de Mora
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("placetopay");
-              setError(null);
-              setSuccess(null);
-            }}
-            className={`flex items-center gap-2 px-6 py-4 font-medium border-b-2 transition-colors ${
-              activeTab === "placetopay"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            <CreditCard className="w-5 h-5" />
-            PlaceToPay
+            <Receipt className="w-5 h-5" />
+            Facturación
           </button>
         </div>
 
@@ -257,9 +222,30 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* CONTENIDO DEL NUEVO TAB FINANZAS */}
-              {activeTab === "finances" && (
-                <div className="space-y-6">
+              {/* CONTENIDO TAB FACTURACIÓN */}
+              {activeTab === "billing" && (
+                <div className="space-y-8">
+                  {/* Sección: Configuración de Facturación */}
+                  <div className="bg-white rounded-lg shadow border border-gray-200">
+                    <div className="p-6 border-b border-gray-200">
+                      <h2 className="text-xl font-semibold text-gray-900">
+                        Configuración de Facturación
+                      </h2>
+                      <p className="text-gray-600 text-sm mt-1">
+                        Define cómo se generan las facturas y cómo los residentes realizarán sus pagos.
+                      </p>
+                    </div>
+                    <div className="p-6">
+                      <BillingConfigForm
+                        key={billingConfig ? JSON.stringify({ m: billingConfig.invoiceGenerationMode, p: billingConfig.paymentMode }) : "empty"}
+                        initialConfig={billingConfig}
+                        onSave={handleSaveBillingConfig}
+                        isSaving={saving}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sección: Políticas de Intereses y Mora */}
                   <div className="bg-white rounded-lg shadow border border-gray-200">
                     <div className="p-6 border-b border-gray-200">
                       <h2 className="text-xl font-semibold text-gray-900">
@@ -273,25 +259,6 @@ export default function SettingsPage() {
                       <FinancialSettingsForm
                         initialConfig={financialSettings || undefined}
                         onSave={handleSaveFinancialSettings}
-                        isSaving={saving}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "placetopay" && (
-                <div className="space-y-6">
-                  <div className="bg-white rounded-lg shadow border border-gray-200">
-                    <div className="p-6 border-b border-gray-200">
-                      <h2 className="text-xl font-semibold text-gray-900">
-                        Credenciales de PlaceToPay
-                      </h2>
-                    </div>
-                    <div className="p-6">
-                      <PlaceToPayConfigForm
-                        initialConfig={placeToPayConfig || undefined}
-                        onSave={handleSavePlaceToPayConfig}
                         isSaving={saving}
                       />
                     </div>

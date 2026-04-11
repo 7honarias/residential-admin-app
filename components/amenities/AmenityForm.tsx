@@ -24,6 +24,25 @@ import {
   Schedule,
 } from "@/app/dashboard/amenities/amenitie.tyes";
 
+// 24h <-> 12h helpers
+const parseTo12h = (t: string): { hour: number; minute: number; period: "AM" | "PM" } => {
+  if (!t) return { hour: 12, minute: 0, period: "AM" };
+  const [hStr, mStr] = t.split(":");
+  let h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  const period: "AM" | "PM" = h >= 12 ? "PM" : "AM";
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return { hour: h, minute: m, period };
+};
+
+const formatTo24h = (hour: number, minute: number, period: "AM" | "PM"): string => {
+  let h = hour;
+  if (period === "AM" && h === 12) h = 0;
+  else if (period === "PM" && h !== 12) h += 12;
+  return `${String(h).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+};
+
 const days = [
   { label: "Lunes", value: 1 },
   { label: "Martes", value: 2 },
@@ -103,6 +122,31 @@ export default function AmenityForm({
     }
     return null;
   };
+
+  // Calcula en tiempo real qué índices tienen solapamiento
+  const overlappingIndices = (() => {
+    const result = new Set<number>();
+    const grouped: Record<number, number[]> = {};
+    schedules.forEach((s, i) => {
+      if (!grouped[s.day_of_week]) grouped[s.day_of_week] = [];
+      grouped[s.day_of_week].push(i);
+    });
+    for (const idxList of Object.values(grouped)) {
+      for (let a = 0; a < idxList.length; a++) {
+        for (let b = a + 1; b < idxList.length; b++) {
+          const sa = schedules[idxList[a]];
+          const sb = schedules[idxList[b]];
+          if (sa.start_time && sa.end_time && sb.start_time && sb.end_time) {
+            if (sa.start_time < sb.end_time && sb.start_time < sa.end_time) {
+              result.add(idxList[a]);
+              result.add(idxList[b]);
+            }
+          }
+        }
+      }
+    }
+    return result;
+  })();
 
   const onSubmit = async (data: AmenityFormData) => {
     setError("");
@@ -321,20 +365,70 @@ export default function AmenityForm({
                   ) : (
                     daySchedules.map((s) => {
                       const realIndex = schedules.findIndex((item) => item === s);
+                      const isOverlapping = overlappingIndices.has(realIndex);
+                      const st = parseTo12h(s.start_time);
+                      const et = parseTo12h(s.end_time);
+                      const sel = `bg-transparent outline-none cursor-pointer appearance-none text-center text-[10px] font-bold`;
+                      const tc = isOverlapping ? "text-red-600" : "text-slate-700";
+                      const ac = isOverlapping ? "text-red-600" : "text-blue-500";
                       return (
                         <div key={realIndex} className="flex items-center gap-2 group animate-in slide-in-from-right-2">
-                          <div className="flex bg-slate-50 rounded-xl p-1 items-center border border-slate-100">
-                            <input
-                                type="time" value={s.start_time}
-                                onChange={(e) => updateSchedule(realIndex, "start_time", e.target.value)}
-                                className="bg-transparent text-[11px] font-bold outline-none px-1 w-16"
-                            />
-                            <span className="text-slate-300 mx-0.5"><ChevronRight className="w-3 h-3"/></span>
-                            <input
-                                type="time" value={s.end_time}
-                                onChange={(e) => updateSchedule(realIndex, "end_time", e.target.value)}
-                                className="bg-transparent text-[11px] font-bold outline-none px-1 w-16"
-                            />
+                          <div className={`flex bg-slate-50 rounded-xl p-1.5 items-center border flex-1 justify-between ${
+                            isOverlapping ? "border-red-300 bg-red-50" : "border-slate-100"
+                          }`}>
+                            {/* Inicio */}
+                            <div className="flex items-center gap-px">
+                              <select
+                                value={st.hour}
+                                onChange={(e) => updateSchedule(realIndex, "start_time", formatTo24h(+e.target.value, st.minute, st.period))}
+                                className={`${sel} ${tc} w-5`}
+                              >
+                                {[1,2,3,4,5,6,7,8,9,10,11,12].map(h => <option key={h} value={h}>{h}</option>)}
+                              </select>
+                              <span className={`text-[10px] font-bold ${tc}`}>:</span>
+                              <select
+                                value={st.minute}
+                                onChange={(e) => updateSchedule(realIndex, "start_time", formatTo24h(st.hour, +e.target.value, st.period))}
+                                className={`${sel} ${tc} w-6`}
+                              >
+                                {[0,5,10,15,20,25,30,35,40,45,50,55].map(m => <option key={m} value={m}>{String(m).padStart(2,"0")}</option>)}
+                              </select>
+                              <select
+                                value={st.period}
+                                onChange={(e) => updateSchedule(realIndex, "start_time", formatTo24h(st.hour, st.minute, e.target.value as "AM"|"PM"))}
+                                className={`${sel} ${ac} font-black w-7`}
+                              >
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                              </select>
+                            </div>
+                            <ChevronRight className={`w-3 h-3 flex-shrink-0 ${isOverlapping ? "text-red-300" : "text-slate-300"}`} />
+                            {/* Fin */}
+                            <div className="flex items-center gap-px">
+                              <select
+                                value={et.hour}
+                                onChange={(e) => updateSchedule(realIndex, "end_time", formatTo24h(+e.target.value, et.minute, et.period))}
+                                className={`${sel} ${tc} w-5`}
+                              >
+                                {[1,2,3,4,5,6,7,8,9,10,11,12].map(h => <option key={h} value={h}>{h}</option>)}
+                              </select>
+                              <span className={`text-[10px] font-bold ${tc}`}>:</span>
+                              <select
+                                value={et.minute}
+                                onChange={(e) => updateSchedule(realIndex, "end_time", formatTo24h(et.hour, +e.target.value, et.period))}
+                                className={`${sel} ${tc} w-6`}
+                              >
+                                {[0,5,10,15,20,25,30,35,40,45,50,55].map(m => <option key={m} value={m}>{String(m).padStart(2,"0")}</option>)}
+                              </select>
+                              <select
+                                value={et.period}
+                                onChange={(e) => updateSchedule(realIndex, "end_time", formatTo24h(et.hour, et.minute, e.target.value as "AM"|"PM"))}
+                                className={`${sel} ${ac} font-black w-7`}
+                              >
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                              </select>
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -358,7 +452,7 @@ export default function AmenityForm({
       <div className="fixed bottom-0 left-0 right-0 md:left-64 p-6 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent flex justify-center z-10">
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || overlappingIndices.size > 0}
           className="w-full max-w-lg flex items-center justify-center gap-3 bg-slate-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-600 active:scale-95 disabled:opacity-50 transition-all shadow-2xl shadow-blue-200"
         >
           {loading ? (

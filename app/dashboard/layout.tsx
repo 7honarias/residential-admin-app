@@ -13,6 +13,7 @@ const pageTitle: Record<string, string> = {
   "/dashboard/pqrs": "PQRS",
   "/dashboard/finances": "Finanzas",
   "/dashboard/finances/payments": "Pagos",
+  "/dashboard/finances/suppliers": "Proveedores",
   "/dashboard/apartments": "Apartamentos",
   "/dashboard/parking": "Parqueaderos",
   "/dashboard/packages": "Paquetería",

@@ -14,7 +14,7 @@ const PARKING_TYPES = [
   { value: "RESIDENT", label: "Residente" },
   { value: "VISITOR", label: "Visitante" },
   { value: "SERVICE", label: "Servicio" },
-  { value: "DISABLED", label: "Discapacitado" },
+  { value: "DISABLED", label: "Deshabilitado" },
 ];
 
 export default function ChangeTypeModal({ onClose, onSave, isProcessing, currentType }: ChangeTypeModalProps) {

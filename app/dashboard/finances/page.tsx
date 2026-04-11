@@ -8,8 +8,9 @@ import InvoicesTable from '@/components/finances/InvoicesTable';
 import InvoiceFilters from '@/components/finances/InvoiceFilters';
 import InvoiceDetailModal from '@/components/finances/InvoiceDetailModal';
 import ManualPaymentModal from '@/components/finances/ManualPaymentModal';
+import UploadInvoicesModal from '@/components/finances/UploadInvoicesModal';
 import InvoicesTableSkeleton from '@/components/finances/InvoicesTableSkeleton';
-import { AlertCircle, Plus } from 'lucide-react';
+import { AlertCircle, Plus, Upload } from 'lucide-react';
 
 type FilterStatus = InvoiceStatus | 'ALL';
 
@@ -32,6 +33,7 @@ export default function FinancesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<IInvoice | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export default function FinancesPage() {
             // 1. Creamos un Set con los IDs que ya tenemos en pantalla
             const existingIds = new Set(prev.map(inv => inv.id));
             // 2. Filtramos de la nueva lista solo los que NO existan ya
-            const uniqueNewInvoices = invoicesList.filter(inv => !existingIds.has(inv.id));
+            const uniqueNewInvoices = invoicesList.filter((inv: IInvoice) => !existingIds.has(inv.id));
             // 3. Unimos la lista vieja con la nueva limpia
             return [...prev, ...uniqueNewInvoices];
           });
@@ -146,6 +148,10 @@ export default function FinancesPage() {
     setIsPaymentModalOpen(false);
   };
 
+  const handleUploadSuccess = () => {
+    loadInvoices();
+  };
+
   if (!complexId) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -168,14 +174,24 @@ export default function FinancesPage() {
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Finanzas</h1>
             <p className="text-slate-600 text-sm">Visualiza y gestiona las facturas del conjunto</p>
           </div>
-          <button
-            onClick={handlePaymentModalOpen}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium whitespace-nowrap flex-shrink-0"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">Registrar Pago Manual</span>
-            <span className="sm:hidden">Pago Manual</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors font-medium whitespace-nowrap flex-shrink-0"
+            >
+              <Upload className="w-5 h-5" />
+              <span className="hidden sm:inline">Cargar Facturas</span>
+              <span className="sm:hidden">Excel</span>
+            </button>
+            <button
+              onClick={handlePaymentModalOpen}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium whitespace-nowrap flex-shrink-0"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="hidden sm:inline">Registrar Pago Manual</span>
+              <span className="sm:hidden">Pago Manual</span>
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -256,6 +272,12 @@ export default function FinancesPage() {
         isOpen={isPaymentModalOpen}
         onClose={handlePaymentModalClose}
         onSuccess={handlePaymentSuccess}
+      />
+
+      <UploadInvoicesModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onSuccess={handleUploadSuccess}
       />
     </div>
   );

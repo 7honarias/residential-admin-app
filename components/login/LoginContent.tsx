@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -62,6 +63,16 @@ export default function LoginContent() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-md">
+        <div className="mb-5 flex justify-center">
+          <Image
+            src="/logo-web.png"
+            alt="AdminResidencial"
+            width={220}
+            height={70}
+            className="h-14 w-auto object-contain"
+            priority
+          />
+        </div>
         <h1 className="text-2xl font-bold mb-6 text-center">Iniciar Sesión</h1>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">

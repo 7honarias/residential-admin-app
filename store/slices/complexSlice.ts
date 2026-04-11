@@ -3,6 +3,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 interface Complex {
   id: string;
   name: string;
+  address?: string;
 }
 
 interface ComplexState {

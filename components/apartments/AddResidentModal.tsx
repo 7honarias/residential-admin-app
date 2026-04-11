@@ -23,6 +23,8 @@ export default function AddResidentModal({
 }: addResidentModalProps) {
   const [form, setForm] = useState<ResidentForm>({
     fullName: "",
+    documentTypeCode: "CC",
+    documentNumber: "",
     email: "",
     confirmEmail: "",
     phone: "",
@@ -34,6 +36,8 @@ export default function AddResidentModal({
   useEffect(() => {
     setForm({
       fullName: "",
+      documentTypeCode: "CC",
+      documentNumber: "",
       email: "",
       confirmEmail: "",
       phone: "",
@@ -44,7 +48,7 @@ export default function AddResidentModal({
 
   if (!isOpen || !apartmentId) return null;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
@@ -54,6 +58,10 @@ export default function AddResidentModal({
   };
 
   const handleSubmit = async () => {
+    if (!form.documentNumber.trim()) {
+      setError("El número de documento es requerido");
+      return;
+    }
     if (form.email !== form.confirmEmail) {
       setError("Los correos electrónicos no coinciden");
       return;
@@ -112,6 +120,40 @@ export default function AddResidentModal({
               placeholder="Ej: Juan Pérez"
               className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-slate-600">
+                Tipo de documento
+              </label>
+              <select
+                name="documentType"
+                value={form.documentTypeCode}
+                onChange={handleChange}
+                className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+              >
+                <option value="CC">CC — Cédula de Ciudadanía</option>
+                <option value="CE">CE — Cédula de Extranjería</option>
+                <option value="TI">TI — Tarjeta de Identidad</option>
+                <option value="PA">PA — Pasaporte</option>
+                <option value="NIT">NIT</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-600">
+                Número de documento
+              </label>
+              <input
+                type="text"
+                name="documentNumber"
+                value={form.documentNumber}
+                onChange={handleChange}
+                placeholder="Ej: 1234567890"
+                required
+                className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+              />
+            </div>
           </div>
 
           <div>

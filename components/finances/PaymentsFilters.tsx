@@ -5,25 +5,33 @@ import { PaymentMethod } from '@/app/dashboard/finances/invoices.types';
 interface PaymentsFiltersProps {
   paymentMethod: PaymentMethod | null;
   apartmentSearch: string;
+  periodMonth: string;
   startDate: string;
   endDate: string;
   onPaymentMethodChange: (method: PaymentMethod | null) => void;
   onApartmentSearchChange: (search: string) => void;
+  onPeriodMonthChange: (month: string) => void;
   onDateRangeChange: (start: string, end: string) => void;
   onApplyFilters: () => void;
   onClearFilters: () => void;
+  onDownloadExcel: () => void;
+  isExporting?: boolean;
 }
 
 export default function PaymentsFilters({
   paymentMethod,
   apartmentSearch,
+  periodMonth,
   startDate,
   endDate,
   onPaymentMethodChange,
   onApartmentSearchChange,
+  onPeriodMonthChange,
   onDateRangeChange,
   onApplyFilters,
   onClearFilters,
+  onDownloadExcel,
+  isExporting = false,
 }: PaymentsFiltersProps) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-6 space-y-6">
@@ -33,7 +41,7 @@ export default function PaymentsFilters({
       </div>
 
       {/* Filters Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Payment Method Filter */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -68,6 +76,19 @@ export default function PaymentsFilters({
           />
         </div>
 
+        {/* Month Period */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Mes
+          </label>
+          <input
+            type="month"
+            value={periodMonth}
+            onChange={(e) => onPeriodMonthChange(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
         {/* Start Date */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -97,6 +118,13 @@ export default function PaymentsFilters({
 
       {/* Action Buttons */}
       <div className="flex gap-3 justify-end">
+        <button
+          onClick={onDownloadExcel}
+          disabled={isExporting}
+          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isExporting ? 'Generando Excel...' : 'Descargar Excel'}
+        </button>
         <button
           onClick={onClearFilters}
           className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
