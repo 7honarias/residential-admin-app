@@ -1,10 +1,18 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+export interface Membership {
+  complex_id: string;
+  apartment_id: string | null;
+  role: string;
+  is_active: boolean;
+}
+
 interface User {
   id: string;
   name: string;
   email: string;
   role: string;
+  memberships: Membership[];
 }
 
 interface AuthState {
@@ -31,6 +39,11 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.isAuthenticated = true;
     },
+    updateRole: (state, action: PayloadAction<string>) => {
+      if (state.user) {
+        state.user.role = action.payload;
+      }
+    },
     logout: (state) => {
       state.token = null;
       state.user = null;
@@ -47,5 +60,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setAuth, logout, restoreSession } = authSlice.actions;
+export const { setAuth, updateRole, logout, restoreSession } = authSlice.actions;
 export default authSlice.reducer;

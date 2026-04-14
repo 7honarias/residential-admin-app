@@ -143,7 +143,7 @@ export const createQuickAlert = async ({
   if (!complexId) throw new Error('ComplexId is required');
 
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/quickAlert?complexId=${complexId}`,
+    `${process.env.NEXT_PUBLIC_API_URL}/manageQuickAlerts?complexId=${complexId}`,
     {
       method: 'POST',
       headers: {

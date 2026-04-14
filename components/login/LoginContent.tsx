@@ -7,6 +7,9 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppSelector } from "@/store/hooks";
 
+const getRoleRedirect = (role: string | undefined | null): string =>
+  role === "SECURITY" ? "/gatehouse" : "/dashboard";
+
 export default function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,7 +27,7 @@ export default function LoginContent() {
     try {
       setLoading(true);
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -33,7 +36,10 @@ export default function LoginContent() {
         setError(error.message);
         return;
       }
-      router.push("/dashboard");
+      const memberships = data?.user?.app_metadata?.memberships || [];
+      const firstActive = memberships.find((m: { is_active: boolean }) => m.is_active) || memberships[0];
+      const role = firstActive?.role as string | undefined;
+      router.push(getRoleRedirect(role));
     } catch {
       setError("Ocurrió un error inesperado");
     } finally {
@@ -41,16 +47,16 @@ export default function LoginContent() {
     }
   };
 
-  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
     if (isAuthenticated) {
-      const redirectTo = searchParams.get("redirectTo") || "/dashboard";
+      const redirectTo = searchParams.get("redirectTo") || getRoleRedirect(user?.role);
       router.push(redirectTo);
     } else {
       setIsChecking(false);
     }
-  }, [isAuthenticated, router, searchParams]);
+  }, [isAuthenticated, user, router, searchParams]);
 
   if (isChecking || isAuthenticated) {
     return (

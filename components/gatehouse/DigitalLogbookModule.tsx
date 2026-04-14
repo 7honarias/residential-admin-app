@@ -118,7 +118,12 @@ export default function DigitalLogbookModule({ token, complexId }: DigitalLogboo
           limit: 10,
         });
 
-        setLogs((prev) => (cursor ? [...prev, ...response.logs] : response.logs));
+        setLogs((prev) => {
+          if (!cursor) return response.logs;
+          const existingIds = new Set(prev.map((l) => l.id));
+          const newLogs = response.logs.filter((l) => !existingIds.has(l.id));
+          return [...prev, ...newLogs];
+        });
         setNextCursor(response.next_cursor);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar la bitacora");

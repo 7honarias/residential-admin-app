@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { 
   Home, Building2, Coffee, Settings, LogOut, Car, 
   Users, MessageSquare, Bell, Package, DollarSign, Receipt,
-  ChevronDown, ChevronRight, X 
+  ChevronDown, ChevronRight, X, UserCog 
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
@@ -50,6 +50,7 @@ const menuGroups = [
   {
     label: "Sistema",
     items: [
+      { name: "Usuarios", icon: UserCog, href: "/dashboard/users" },
       { name: "Configuración", icon: Settings, href: "/dashboard/settings" },
     ]
   }

@@ -3,7 +3,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAppSelector } from "@/store/hooks";
+import { useRouter } from "next/navigation";
+import { useAppSelector, useAppDispatch } from "@/store/hooks";
+import { logout as logoutAction } from "@/store/slices/authSlice";
+import { supabase } from "@/lib/supabaseClient";
 import { IPackage, PackageStatus } from "@/app/dashboard/packages/packages.types";
 import { fetchPackages } from "@/services/packages.service";
 import { fetchApartments } from "@/services/apartments.service";
@@ -17,8 +20,34 @@ import DigitalLogbookModule from "@/components/gatehouse/DigitalLogbookModule";
 type TabType = "VISITORS" | "VEHICLES" | "PACKAGES" | "LOGS";
 
 export default function GatehouseDashboard() {
-  const token = useAppSelector((state) => state.auth.token);
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { token, isAuthenticated, user } = useAppSelector((state) => state.auth);
   const complexId = useAppSelector((state) => state.complex.activeComplex?.id);
+
+  // Route guard: only SECURITY users can access this page
+  // Wait for user to be resolved before redirecting (async session restore)
+  useEffect(() => {
+    if (!isAuthenticated || !token) {
+      router.replace("/login");
+      return;
+    }
+    if (user === null) return; // still loading — wait
+    if (user.role !== "SECURITY") {
+      const adminRoles = ["ADMIN", "STAFF"];
+      router.replace(adminRoles.includes(user.role) ? "/dashboard" : "/login");
+    }
+  }, [isAuthenticated, token, user, router]);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      dispatch(logoutAction());
+      router.replace("/login");
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
+  };
 
   // Estado para bloques
   const [blocks, setBlocks] = useState<{ id: string; name: string }[]>([]);
@@ -117,6 +146,24 @@ export default function GatehouseDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
+
+      {/* Header con botón cerrar sesión */}
+      <header className="flex items-center justify-between bg-white px-4 py-3 shadow-sm border-b border-slate-200 lg:px-8">
+        <h1 className="text-xl font-bold text-slate-800">🏢 Portería</h1>
+        <div className="flex items-center gap-4">
+          {user?.name && (
+            <span className="text-sm font-medium text-slate-600">
+              👤 {user.name}
+            </span>
+          )}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 transition"
+          >
+            🚪 Cerrar sesión
+          </button>
+        </div>
+      </header>
 
       {/* 2. ÁREA DE TRABAJO PRINCIPAL - Ocupa todo el ancho (Full Width) */}
       <main className="flex-1 max-w-screen-2xl w-full mx-auto p-4 lg:p-8">

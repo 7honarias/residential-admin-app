@@ -43,18 +43,24 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, token } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, token, user } = useAppSelector((state) => state.auth);
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pageHeading = getPageTitle(pathname);
 
   useEffect(() => {
-    if (!isAuthenticated && !token) {
+    if (!isAuthenticated || !token) {
       const redirectUrl = encodeURIComponent(pathname);
-      router.push(`/login?redirectTo=${redirectUrl}`);
+      router.replace(`/login?redirectTo=${redirectUrl}`);
+      return;
     }
-  }, [isAuthenticated, token, router, pathname]);
+    if (user === null) return; // still loading — wait
+    const allowedRoles = ["ADMIN", "STAFF"];
+    if (!allowedRoles.includes(user.role)) {
+      router.replace(user.role === "SECURITY" ? "/gatehouse" : "/login");
+    }
+  }, [isAuthenticated, token, user, router, pathname]);
 
   // Cerrar menú cuando cambia de ruta
   useEffect(() => {
