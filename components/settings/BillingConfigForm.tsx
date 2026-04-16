@@ -20,10 +20,12 @@ import {
 // ─────────────────────────────────────────────
 export type InvoiceGenerationMode = "AUTOMATIC" | "EXCEL_UPLOAD";
 export type PaymentMode = "PAYMENT_GATEWAY" | "REDIRECT_LINK";
+export type GatewayProvider = "PLACETOPAY" | "BOLD";
 
 export interface BillingConfig {
   invoiceGenerationMode: InvoiceGenerationMode;
   paymentMode: PaymentMode;
+  gatewayProvider?: GatewayProvider;
   /** Day of month (1-28) on which invoices are auto-generated */
   invoiceGenerationDay?: number;
   /** Days after generation day before invoice is considered overdue */
@@ -31,7 +33,11 @@ export interface BillingConfig {
   merchantId?: string;
   publicKey?: string;
   privateKey?: string;
+  boldIdentityKey?: string;
+  boldSecretKey?: string;
   redirectPaymentUrl?: string;
+  /** True when the backend has stored secret credentials */
+  hasConfiguredSecrets?: boolean;
 }
 
 interface BillingConfigFormProps {
@@ -124,6 +130,8 @@ interface PasswordInputProps {
   onChange: (v: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** When true, show dots to indicate a saved value exists */
+  hasExistingValue?: boolean;
 }
 
 function PasswordInput({
@@ -133,12 +141,19 @@ function PasswordInput({
   onChange,
   placeholder,
   disabled,
+  hasExistingValue,
 }: PasswordInputProps) {
   const [show, setShow] = useState(false);
+  const displayPlaceholder = !value && hasExistingValue
+    ? "••••••••••••••••"
+    : placeholder;
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-medium text-gray-700">
         {label}
+        {!value && hasExistingValue && (
+          <span className="ml-2 text-xs font-normal text-green-600">✓ Configurada</span>
+        )}
       </label>
       <div className="relative">
         <input
@@ -146,7 +161,7 @@ function PasswordInput({
           type={show ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
+          placeholder={displayPlaceholder}
           disabled={disabled}
           className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm
             focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition
@@ -171,22 +186,28 @@ function PasswordInput({
 type FormState = {
   invoiceMode: InvoiceGenerationMode;
   paymentMode: PaymentMode;
+  gatewayProvider: GatewayProvider;
   invoiceGenerationDay: string;
   paymentDueDays: string;
   merchantId: string;
   publicKey: string;
   privateKey: string;
+  boldIdentityKey: string;
+  boldSecretKey: string;
   redirectUrl: string;
 };
 
 const buildFormState = (c?: BillingConfig | null): FormState => ({
   invoiceMode: c?.invoiceGenerationMode ?? "AUTOMATIC",
   paymentMode: c?.paymentMode ?? "PAYMENT_GATEWAY",
+  gatewayProvider: c?.gatewayProvider ?? "PLACETOPAY",
   invoiceGenerationDay: c?.invoiceGenerationDay?.toString() ?? "1",
   paymentDueDays: c?.paymentDueDays?.toString() ?? "10",
   merchantId: c?.merchantId ?? "",
   publicKey: c?.publicKey ?? "",
   privateKey: c?.privateKey ?? "",
+  boldIdentityKey: c?.boldIdentityKey ?? "",
+  boldSecretKey: c?.boldSecretKey ?? "",
   redirectUrl: c?.redirectPaymentUrl ?? "",
 });
 
@@ -203,6 +224,8 @@ export default function BillingConfigForm({
     setForm((f) => ({ ...f, invoiceMode: v }));
   const setPaymentMode = (v: PaymentMode) =>
     setForm((f) => ({ ...f, paymentMode: v }));
+  const setGatewayProvider = (v: GatewayProvider) =>
+    setForm((f) => ({ ...f, gatewayProvider: v }));
   const setInvoiceGenerationDay = (v: string) =>
     setForm((f) => ({ ...f, invoiceGenerationDay: v }));
   const setPaymentDueDays = (v: string) =>
@@ -210,9 +233,16 @@ export default function BillingConfigForm({
   const setMerchantId = (v: string) => setForm((f) => ({ ...f, merchantId: v }));
   const setPublicKey = (v: string) => setForm((f) => ({ ...f, publicKey: v }));
   const setPrivateKey = (v: string) => setForm((f) => ({ ...f, privateKey: v }));
+  const setBoldIdentityKey = (v: string) => setForm((f) => ({ ...f, boldIdentityKey: v }));
+  const setBoldSecretKey = (v: string) => setForm((f) => ({ ...f, boldSecretKey: v }));
   const setRedirectUrl = (v: string) => setForm((f) => ({ ...f, redirectUrl: v }));
 
-  const { invoiceMode, paymentMode, invoiceGenerationDay, paymentDueDays, merchantId, publicKey, privateKey, redirectUrl } = form;
+  const { invoiceMode, paymentMode, gatewayProvider, invoiceGenerationDay, paymentDueDays, merchantId, publicKey, privateKey, boldIdentityKey, boldSecretKey, redirectUrl } = form;
+
+  const hasConfiguredSecrets = initialConfig?.hasConfiguredSecrets === true;
+
+  /** For secret fields: send REDACTED if empty but already configured in backend */
+  const REDACTED = "**REDACTED**";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,11 +262,22 @@ export default function BillingConfigForm({
     }
 
     if (paymentMode === "PAYMENT_GATEWAY") {
-      if (!merchantId.trim() || !publicKey.trim() || !privateKey.trim()) {
-        setValidationError(
-          "Completa los tres campos de la pasarela de pagos (Merchant ID, Public Key y Private Key)."
-        );
-        return;
+      if (gatewayProvider === "PLACETOPAY") {
+        const needsSecrets = !hasConfiguredSecrets;
+        if (!merchantId.trim() || (needsSecrets && (!publicKey.trim() || !privateKey.trim()))) {
+          setValidationError(
+            "Completa los campos de PlaceToPay (Merchant ID, Public Key y Private Key)."
+          );
+          return;
+        }
+      } else if (gatewayProvider === "BOLD") {
+        const needsSecrets = !hasConfiguredSecrets;
+        if (needsSecrets && (!boldIdentityKey.trim() || !boldSecretKey.trim())) {
+          setValidationError(
+            "Completa los campos de BOLD (Llave de Identidad y Llave Secreta)."
+          );
+          return;
+        }
       }
     }
 
@@ -256,13 +297,24 @@ export default function BillingConfigForm({
     await onSave({
       invoiceGenerationMode: invoiceMode,
       paymentMode,
+      gatewayProvider: paymentMode === "PAYMENT_GATEWAY" ? gatewayProvider : undefined,
       invoiceGenerationDay:
         invoiceMode === "AUTOMATIC" ? parseInt(invoiceGenerationDay) : undefined,
       paymentDueDays:
         invoiceMode === "AUTOMATIC" ? parseInt(paymentDueDays) : undefined,
-      merchantId: paymentMode === "PAYMENT_GATEWAY" ? merchantId.trim() : undefined,
-      publicKey: paymentMode === "PAYMENT_GATEWAY" ? publicKey.trim() : undefined,
-      privateKey: paymentMode === "PAYMENT_GATEWAY" ? privateKey.trim() : undefined,
+      merchantId: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "PLACETOPAY" ? merchantId.trim() : undefined,
+      publicKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "PLACETOPAY"
+        ? (publicKey.trim() || (hasConfiguredSecrets ? REDACTED : undefined))
+        : undefined,
+      privateKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "PLACETOPAY"
+        ? (privateKey.trim() || (hasConfiguredSecrets ? REDACTED : undefined))
+        : undefined,
+      boldIdentityKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "BOLD"
+        ? (boldIdentityKey.trim() || (hasConfiguredSecrets ? REDACTED : undefined))
+        : undefined,
+      boldSecretKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "BOLD"
+        ? (boldSecretKey.trim() || (hasConfiguredSecrets ? REDACTED : undefined))
+        : undefined,
       redirectPaymentUrl:
         paymentMode === "REDIRECT_LINK" ? redirectUrl.trim() : undefined,
     });
@@ -425,7 +477,7 @@ export default function BillingConfigForm({
           <SelectionCard
             icon={<CreditCard className="w-5 h-5" />}
             title="Pasarela de Pagos"
-            description="Integración con PlaceToPay. Los residentes pagan directamente desde la app de forma segura."
+            description="Integración con PlaceToPay o BOLD. Los residentes pagan directamente desde la app de forma segura."
             badge="Integrado"
             selected={paymentMode === "PAYMENT_GATEWAY"}
             onClick={() => setPaymentMode("PAYMENT_GATEWAY")}
@@ -441,59 +493,172 @@ export default function BillingConfigForm({
           />
         </div>
 
-        {/* ── PlaceToPay sub-form ── */}
+        {/* ── Gateway provider selector + credential forms ── */}
         {paymentMode === "PAYMENT_GATEWAY" && (
-          <div className="ml-8 mt-2 p-6 bg-gray-50 border border-gray-200 rounded-xl space-y-5">
-            <div className="flex items-center gap-2 mb-1">
-              <CreditCard className="w-4 h-4 text-blue-600" />
-              <p className="text-sm font-semibold text-gray-800">
-                Credenciales de PlaceToPay
-              </p>
+          <div className="ml-8 mt-2 space-y-4">
+            {/* Gateway provider selector */}
+            <div className="p-6 bg-gray-50 border border-gray-200 rounded-xl space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <CreditCard className="w-4 h-4 text-blue-600" />
+                <p className="text-sm font-semibold text-gray-800">
+                  Selecciona la Pasarela de Pagos
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setGatewayProvider("PLACETOPAY")}
+                  disabled={isSaving}
+                  className={`
+                    relative text-left p-4 rounded-lg border-2 transition-all duration-200
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                    ${isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:shadow-sm"}
+                    ${
+                      gatewayProvider === "PLACETOPAY"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-blue-300"
+                    }
+                  `}
+                >
+                  {gatewayProvider === "PLACETOPAY" && (
+                    <span className="absolute top-2 right-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    </span>
+                  )}
+                  <p className={`font-semibold text-sm ${gatewayProvider === "PLACETOPAY" ? "text-blue-700" : "text-gray-800"}`}>
+                    PlaceToPay
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Pagos con PSE, tarjetas de crédito y débito.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGatewayProvider("BOLD")}
+                  disabled={isSaving}
+                  className={`
+                    relative text-left p-4 rounded-lg border-2 transition-all duration-200
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                    ${isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:shadow-sm"}
+                    ${
+                      gatewayProvider === "BOLD"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-blue-300"
+                    }
+                  `}
+                >
+                  {gatewayProvider === "BOLD" && (
+                    <span className="absolute top-2 right-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    </span>
+                  )}
+                  <p className={`font-semibold text-sm ${gatewayProvider === "BOLD" ? "text-blue-700" : "text-gray-800"}`}>
+                    BOLD
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Pagos con link de pago, datáfono y transferencias.
+                  </p>
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label
-                htmlFor="merchantId"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Merchant ID
-              </label>
-              <input
-                id="merchantId"
-                type="text"
-                value={merchantId}
-                onChange={(e) => setMerchantId(e.target.value)}
-                placeholder="Ingresa el Merchant ID de PlaceToPay"
-                disabled={isSaving}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm
-                  focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition
-                  disabled:bg-gray-100 disabled:text-gray-400"
-              />
-            </div>
+            {/* PlaceToPay credentials */}
+            {gatewayProvider === "PLACETOPAY" && (
+              <div className="p-6 bg-gray-50 border border-gray-200 rounded-xl space-y-5">
+                <div className="flex items-center gap-2 mb-1">
+                  <CreditCard className="w-4 h-4 text-blue-600" />
+                  <p className="text-sm font-semibold text-gray-800">
+                    Credenciales de PlaceToPay
+                  </p>
+                </div>
 
-            <PasswordInput
-              id="publicKey"
-              label="Public Key"
-              value={publicKey}
-              onChange={setPublicKey}
-              placeholder="Clave pública de PlaceToPay"
-              disabled={isSaving}
-            />
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="merchantId"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Merchant ID
+                  </label>
+                  <input
+                    id="merchantId"
+                    type="text"
+                    value={merchantId}
+                    onChange={(e) => setMerchantId(e.target.value)}
+                    placeholder="Ingresa el Merchant ID de PlaceToPay"
+                    disabled={isSaving}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm
+                      focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition
+                      disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                </div>
 
-            <PasswordInput
-              id="privateKey"
-              label="Private Key"
-              value={privateKey}
-              onChange={setPrivateKey}
-              placeholder="Clave privada de PlaceToPay"
-              disabled={isSaving}
-            />
+                <PasswordInput
+                  id="publicKey"
+                  label="Public Key"
+                  value={publicKey}
+                  onChange={setPublicKey}
+                  placeholder="Clave pública de PlaceToPay"
+                  disabled={isSaving}
+                  hasExistingValue={hasConfiguredSecrets}
+                />
 
-            <p className="text-xs text-gray-500 flex items-start gap-1.5 pt-1">
-              <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-              Las claves son almacenadas de forma cifrada. Puedes obtenerlas en
-              el panel de administración de PlaceToPay.
-            </p>
+                <PasswordInput
+                  id="privateKey"
+                  label="Private Key"
+                  value={privateKey}
+                  onChange={setPrivateKey}
+                  placeholder="Clave privada de PlaceToPay"
+                  disabled={isSaving}
+                  hasExistingValue={hasConfiguredSecrets}
+                />
+
+                <p className="text-xs text-gray-500 flex items-start gap-1.5 pt-1">
+                  <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Las claves son almacenadas de forma cifrada. Puedes obtenerlas en
+                  el panel de administración de PlaceToPay.
+                </p>
+              </div>
+            )}
+
+            {/* BOLD credentials */}
+            {gatewayProvider === "BOLD" && (
+              <div className="p-6 bg-gray-50 border border-gray-200 rounded-xl space-y-5">
+                <div className="flex items-center gap-2 mb-1">
+                  <CreditCard className="w-4 h-4 text-blue-600" />
+                  <p className="text-sm font-semibold text-gray-800">
+                    Credenciales de BOLD
+                  </p>
+                </div>
+
+                <PasswordInput
+                  id="boldIdentityKey"
+                  label="Llave de Identidad"
+                  value={boldIdentityKey}
+                  onChange={setBoldIdentityKey}
+                  placeholder="Ingresa la llave de identidad de BOLD"
+                  disabled={isSaving}
+                  hasExistingValue={hasConfiguredSecrets}
+                />
+
+                <PasswordInput
+                  id="boldSecretKey"
+                  label="Llave Secreta"
+                  value={boldSecretKey}
+                  onChange={setBoldSecretKey}
+                  placeholder="Ingresa la llave secreta de BOLD"
+                  disabled={isSaving}
+                  hasExistingValue={hasConfiguredSecrets}
+                />
+
+                <p className="text-xs text-gray-500 flex items-start gap-1.5 pt-1">
+                  <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Las claves son almacenadas de forma cifrada. Puedes obtenerlas en
+                  el panel de desarrolladores de BOLD.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

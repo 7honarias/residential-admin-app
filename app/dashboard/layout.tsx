@@ -18,6 +18,7 @@ const pageTitle: Record<string, string> = {
   "/dashboard/parking": "Parqueaderos",
   "/dashboard/packages": "Paquetería",
   "/dashboard/amenities": "Zonas",
+  "/dashboard/posts": "Publicaciones",
   "/dashboard/assemblies": "Asambleas",
   "/dashboard/settings": "Configuración",
 };
@@ -64,7 +65,8 @@ export default function DashboardLayout({
 
   // Cerrar menú cuando cambia de ruta
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobileMenuOpen(false);
   }, [pathname]);
 

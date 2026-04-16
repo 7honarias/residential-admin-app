@@ -623,18 +623,27 @@ export const updateFinancialSettings = async (
 
 export type InvoiceGenerationMode = "AUTOMATIC" | "EXCEL_UPLOAD";
 export type PaymentMode = "PAYMENT_GATEWAY" | "REDIRECT_LINK";
+export type GatewayProvider = "PLACETOPAY" | "BOLD";
 
 export interface BillingConfig {
   invoiceGenerationMode: InvoiceGenerationMode;
   paymentMode: PaymentMode;
+  /** Which payment gateway provider to use */
+  gatewayProvider?: GatewayProvider;
   /** Day of month (1-28) on which invoices are auto-generated */
   invoiceGenerationDay?: number;
   /** Days after generation day before invoice is considered overdue */
   paymentDueDays?: number;
+  // PlaceToPay credentials
   merchantId?: string;
   publicKey?: string;
   privateKey?: string;
+  // BOLD credentials
+  boldIdentityKey?: string;
+  boldSecretKey?: string;
   redirectPaymentUrl?: string;
+  /** True when the backend has stored secret credentials (they are never returned) */
+  hasConfiguredSecrets?: boolean;
 }
 
 export interface GetBillingConfigParams {
@@ -673,19 +682,25 @@ export const fetchBillingConfig = async (
     const data = await response.json();
     if (!data.config) return null;
 
+    const creds = data.config.gateway_credentials ?? {};
+
     return {
       invoiceGenerationMode: data.config.invoice_generation_mode ?? "AUTOMATIC",
       paymentMode: data.config.payment_mode ?? "PAYMENT_GATEWAY",
+      gatewayProvider: data.config.gateway_provider ?? "PLACETOPAY",
       invoiceGenerationDay: data.config.invoice_generation_day != null
         ? Number(data.config.invoice_generation_day)
         : undefined,
       paymentDueDays: data.config.payment_due_days != null
         ? Number(data.config.payment_due_days)
         : undefined,
-      merchantId: data.config.merchant_id,
-      publicKey: data.config.public_key,
-      privateKey: data.config.private_key,
+      merchantId: creds.merchant_id ?? undefined,
+      publicKey: creds.public_key ?? undefined,
+      privateKey: undefined,
+      boldIdentityKey: creds.bold_identity_key ?? undefined,
+      boldSecretKey: undefined,
       redirectPaymentUrl: data.config.redirect_payment_url,
+      hasConfiguredSecrets: creds.is_configured === true,
     };
   } catch (error) {
     console.error("Error fetching billing config:", error);
@@ -711,11 +726,14 @@ export const updateBillingConfig = async (
         body: JSON.stringify({
           invoice_generation_mode: params.config.invoiceGenerationMode,
           payment_mode: params.config.paymentMode,
+          gateway_provider: params.config.gatewayProvider,
           invoice_generation_day: params.config.invoiceGenerationDay,
           payment_due_days: params.config.paymentDueDays,
           merchant_id: params.config.merchantId,
           public_key: params.config.publicKey,
           private_key: params.config.privateKey,
+          bold_identity_key: params.config.boldIdentityKey,
+          bold_secret_key: params.config.boldSecretKey,
           redirect_payment_url: params.config.redirectPaymentUrl,
         }),
       }
@@ -729,19 +747,25 @@ export const updateBillingConfig = async (
     const data = await response.json();
     if (!data.config) return null;
 
+    const creds = data.config.gateway_credentials ?? {};
+
     return {
       invoiceGenerationMode: data.config.invoice_generation_mode ?? "AUTOMATIC",
       paymentMode: data.config.payment_mode ?? "PAYMENT_GATEWAY",
+      gatewayProvider: data.config.gateway_provider ?? "PLACETOPAY",
       invoiceGenerationDay: data.config.invoice_generation_day != null
         ? Number(data.config.invoice_generation_day)
         : undefined,
       paymentDueDays: data.config.payment_due_days != null
         ? Number(data.config.payment_due_days)
         : undefined,
-      merchantId: data.config.merchant_id,
-      publicKey: data.config.public_key,
-      privateKey: data.config.private_key,
+      merchantId: creds.merchant_id ?? undefined,
+      publicKey: creds.public_key ?? undefined,
+      privateKey: undefined,
+      boldIdentityKey: creds.bold_identity_key ?? undefined,
+      boldSecretKey: undefined,
       redirectPaymentUrl: data.config.redirect_payment_url,
+      hasConfiguredSecrets: creds.is_configured === true,
     };
   } catch (error) {
     console.error("Error updating billing config:", error);
