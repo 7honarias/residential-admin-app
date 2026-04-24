@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAppSelector } from "@/store/hooks";
-import { AlertCircle, Save, Loader, Settings, Receipt } from "lucide-react";
+import { AlertCircle, Save, Loader, Settings, Receipt, ShieldCheck } from "lucide-react";
 import CoefficientPricingTable from "@/components/settings/CoefficientPricingTable";
 import FinancialSettingsForm from "@/components/settings/FinancialSettingsForm";
 import BillingConfigForm, { BillingConfig as BillingConfigFormData } from "@/components/settings/BillingConfigForm";
+import MfaSetup from "@/components/settings/MfaSetup";
 import {
   fetchFinancialSettings,
   updateFinancialSettings,
@@ -15,7 +16,7 @@ import {
   BillingConfig,
 } from "@/services/settings.service";
 
-type ActiveTab = "administration" | "billing";
+type ActiveTab = "administration" | "billing" | "security";
 
 export default function SettingsPage() {
   const { activeComplex } = useAppSelector((state) => state.complex);
@@ -170,6 +171,23 @@ export default function SettingsPage() {
             <Receipt className="w-5 h-5" />
             Facturación
           </button>
+
+          {/* TAB: SEGURIDAD */}
+          <button
+            onClick={() => {
+              setActiveTab("security");
+              setError(null);
+              setSuccess(null);
+            }}
+            className={`flex items-center gap-2 px-6 py-4 font-medium border-b-2 transition-colors ${
+              activeTab === "security"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <ShieldCheck className="w-5 h-5" />
+            Seguridad
+          </button>
         </div>
 
         {/* Alertas */}
@@ -219,6 +237,19 @@ export default function SettingsPage() {
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* CONTENIDO TAB SEGURIDAD */}
+              {activeTab === "security" && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-1">Seguridad de la cuenta</h2>
+                    <p className="text-gray-600 text-sm">
+                      Gestiona la autenticación en dos pasos para proteger tu acceso.
+                    </p>
+                  </div>
+                  <MfaSetup />
                 </div>
               )}
 

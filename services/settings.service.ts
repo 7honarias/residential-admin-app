@@ -636,7 +636,6 @@ export interface BillingConfig {
   paymentDueDays?: number;
   // PlaceToPay credentials
   merchantId?: string;
-  publicKey?: string;
   privateKey?: string;
   // BOLD credentials
   boldIdentityKey?: string;
@@ -695,7 +694,6 @@ export const fetchBillingConfig = async (
         ? Number(data.config.payment_due_days)
         : undefined,
       merchantId: creds.merchant_id ?? undefined,
-      publicKey: creds.public_key ?? undefined,
       privateKey: undefined,
       boldIdentityKey: creds.bold_identity_key ?? undefined,
       boldSecretKey: undefined,
@@ -730,7 +728,6 @@ export const updateBillingConfig = async (
           invoice_generation_day: params.config.invoiceGenerationDay,
           payment_due_days: params.config.paymentDueDays,
           merchant_id: params.config.merchantId,
-          public_key: params.config.publicKey,
           private_key: params.config.privateKey,
           bold_identity_key: params.config.boldIdentityKey,
           bold_secret_key: params.config.boldSecretKey,
@@ -760,7 +757,6 @@ export const updateBillingConfig = async (
         ? Number(data.config.payment_due_days)
         : undefined,
       merchantId: creds.merchant_id ?? undefined,
-      publicKey: creds.public_key ?? undefined,
       privateKey: undefined,
       boldIdentityKey: creds.bold_identity_key ?? undefined,
       boldSecretKey: undefined,

@@ -31,7 +31,6 @@ export interface BillingConfig {
   /** Days after generation day before invoice is considered overdue */
   paymentDueDays?: number;
   merchantId?: string;
-  publicKey?: string;
   privateKey?: string;
   boldIdentityKey?: string;
   boldSecretKey?: string;
@@ -190,7 +189,6 @@ type FormState = {
   invoiceGenerationDay: string;
   paymentDueDays: string;
   merchantId: string;
-  publicKey: string;
   privateKey: string;
   boldIdentityKey: string;
   boldSecretKey: string;
@@ -204,7 +202,6 @@ const buildFormState = (c?: BillingConfig | null): FormState => ({
   invoiceGenerationDay: c?.invoiceGenerationDay?.toString() ?? "1",
   paymentDueDays: c?.paymentDueDays?.toString() ?? "10",
   merchantId: c?.merchantId ?? "",
-  publicKey: c?.publicKey ?? "",
   privateKey: c?.privateKey ?? "",
   boldIdentityKey: c?.boldIdentityKey ?? "",
   boldSecretKey: c?.boldSecretKey ?? "",
@@ -231,13 +228,12 @@ export default function BillingConfigForm({
   const setPaymentDueDays = (v: string) =>
     setForm((f) => ({ ...f, paymentDueDays: v }));
   const setMerchantId = (v: string) => setForm((f) => ({ ...f, merchantId: v }));
-  const setPublicKey = (v: string) => setForm((f) => ({ ...f, publicKey: v }));
   const setPrivateKey = (v: string) => setForm((f) => ({ ...f, privateKey: v }));
   const setBoldIdentityKey = (v: string) => setForm((f) => ({ ...f, boldIdentityKey: v }));
   const setBoldSecretKey = (v: string) => setForm((f) => ({ ...f, boldSecretKey: v }));
   const setRedirectUrl = (v: string) => setForm((f) => ({ ...f, redirectUrl: v }));
 
-  const { invoiceMode, paymentMode, gatewayProvider, invoiceGenerationDay, paymentDueDays, merchantId, publicKey, privateKey, boldIdentityKey, boldSecretKey, redirectUrl } = form;
+  const { invoiceMode, paymentMode, gatewayProvider, invoiceGenerationDay, paymentDueDays, merchantId, privateKey, boldIdentityKey, boldSecretKey, redirectUrl } = form;
 
   const hasConfiguredSecrets = initialConfig?.hasConfiguredSecrets === true;
 
@@ -264,9 +260,9 @@ export default function BillingConfigForm({
     if (paymentMode === "PAYMENT_GATEWAY") {
       if (gatewayProvider === "PLACETOPAY") {
         const needsSecrets = !hasConfiguredSecrets;
-        if (!merchantId.trim() || (needsSecrets && (!publicKey.trim() || !privateKey.trim()))) {
+        if (!merchantId.trim() || (needsSecrets && !privateKey.trim())) {
           setValidationError(
-            "Completa los campos de PlaceToPay (Merchant ID, Public Key y Private Key)."
+            "Completa los campos de PlaceToPay (Merchant ID y Private Key)."
           );
           return;
         }
@@ -303,9 +299,6 @@ export default function BillingConfigForm({
       paymentDueDays:
         invoiceMode === "AUTOMATIC" ? parseInt(paymentDueDays) : undefined,
       merchantId: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "PLACETOPAY" ? merchantId.trim() : undefined,
-      publicKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "PLACETOPAY"
-        ? (publicKey.trim() || (hasConfiguredSecrets ? REDACTED : undefined))
-        : undefined,
       privateKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "PLACETOPAY"
         ? (privateKey.trim() || (hasConfiguredSecrets ? REDACTED : undefined))
         : undefined,
@@ -593,16 +586,6 @@ export default function BillingConfigForm({
                       disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
-
-                <PasswordInput
-                  id="publicKey"
-                  label="Public Key"
-                  value={publicKey}
-                  onChange={setPublicKey}
-                  placeholder="Clave pública de PlaceToPay"
-                  disabled={isSaving}
-                  hasExistingValue={hasConfiguredSecrets}
-                />
 
                 <PasswordInput
                   id="privateKey"
