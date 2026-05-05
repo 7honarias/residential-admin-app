@@ -2,8 +2,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Loader, PlusCircle, Trash2, ChevronRight } from "lucide-react";
+import {
+  X,
+  Loader,
+  PlusCircle,
+  Trash2,
+  ChevronRight,
+  UploadCloud,
+  Image as ImageIcon,
+} from "lucide-react";
 import { Amenity, Schedule } from "@/app/dashboard/amenities/amenitie.tyes";
+import {
+  deleteAmenityImageByUrl,
+  uploadAmenityImage,
+} from "@/services/amenities.service";
 
 // 24h <-> 12h helpers
 const parseTo12h = (t: string): { hour: number; minute: number; period: "AM" | "PM" } => {
@@ -69,6 +81,9 @@ export default function EditAmenityModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [removeCurrentImage, setRemoveCurrentImage] = useState(false);
 
   // Inicializar formData cuando amenity cambia
   useEffect(() => {
@@ -83,8 +98,35 @@ export default function EditAmenityModal({
       };
       setFormData(newFormData);
       setSchedules(amenity.amenity_schedules ? [...amenity.amenity_schedules] : []);
+      setImageUrl(amenity.image_url || null);
+      setImageFile(null);
+      setRemoveCurrentImage(false);
     }
   }, [amenity, amenity?.id, isOpen]);
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0];
+    if (!selected) return;
+
+    if (imageUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(imageUrl);
+    }
+
+    const objectUrl = URL.createObjectURL(selected);
+    setImageFile(selected);
+    setImageUrl(objectUrl);
+    setRemoveCurrentImage(false);
+  };
+
+  const handleRemoveImage = () => {
+    if (imageUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(imageUrl);
+    }
+
+    setImageUrl(null);
+    setImageFile(null);
+    setRemoveCurrentImage(Boolean(amenity?.image_url));
+  };
 
   const addSchedule = (day: number) => {
     setSchedules((prev) => [...prev, { day_of_week: day, start_time: "08:00", end_time: "20:00" }]);
@@ -182,11 +224,40 @@ export default function EditAmenityModal({
     }
 
     setLoading(true);
+    let uploadedNewImageUrl: string | null = null;
     try {
+      let nextImageUrl: string | null = amenity?.image_url || null;
+
+      if (removeCurrentImage && amenity?.image_url) {
+        await deleteAmenityImageByUrl(amenity.image_url);
+        nextImageUrl = null;
+      }
+
+      if (imageFile) {
+        if (!amenity?.complex_id) {
+          throw new Error("No se pudo determinar el complejo para guardar la imagen.");
+        }
+
+        const uploaded = await uploadAmenityImage({
+          file: imageFile,
+          complexId: amenity.complex_id,
+          amenityId: amenity!.id,
+        });
+
+        uploadedNewImageUrl = uploaded.imageUrl;
+
+        if (amenity?.image_url && !removeCurrentImage) {
+          await deleteAmenityImageByUrl(amenity.image_url);
+        }
+
+        nextImageUrl = uploaded.imageUrl;
+      }
+
       const updatedAmenity: Amenity = {
         ...amenity!,
         name: formData.name,
         description: formData.description,
+        image_url: nextImageUrl,
         capacity: formData.capacity,
         price: formData.price,
         slot_duration: formData.slot_duration,
@@ -196,6 +267,13 @@ export default function EditAmenityModal({
       await onSave(updatedAmenity);
       onClose();
     } catch (err) {
+      if (uploadedNewImageUrl) {
+        try {
+          await deleteAmenityImageByUrl(uploadedNewImageUrl);
+        } catch {
+          // Keep primary error from save flow.
+        }
+      }
       setError(err instanceof Error ? err.message : "Error al guardar los cambios");
     } finally {
       setLoading(false);
@@ -268,6 +346,57 @@ export default function EditAmenityModal({
               rows={3}
               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-bold text-slate-700">Imagen (opcional)</label>
+            <div className="border border-dashed border-slate-300 rounded-xl p-3 bg-slate-50/40">
+              {imageUrl ? (
+                <div className="space-y-3">
+                  <div className="relative h-44 w-full overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <img
+                      src={imageUrl}
+                      alt="Vista previa de la imagen del amenity"
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      disabled={loading || isProcessing}
+                      className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/70 text-white text-xs font-bold px-2 py-1 disabled:opacity-50"
+                    >
+                      <X className="w-3 h-3" />
+                      Quitar
+                    </button>
+                  </div>
+
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold cursor-pointer hover:bg-slate-100 transition-colors">
+                    <UploadCloud className="w-4 h-4" />
+                    Reemplazar imagen
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleImageChange}
+                      disabled={loading || isProcessing}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer text-slate-500 hover:text-slate-700 transition-colors">
+                  <ImageIcon className="w-6 h-6" />
+                  <span className="text-xs font-bold">Subir imagen del amenity</span>
+                  <span className="text-[11px]">JPG, PNG o WebP. Máximo 5 MB.</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleImageChange}
+                    disabled={loading || isProcessing}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
           </div>
 
           {/* Grid de campos numéricos */}

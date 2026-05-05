@@ -1,4 +1,5 @@
 import {
+  IInvoice,
   IInvoiceDetail,
   IManualPaymentPayload,
   IManualPaymentResponse,
@@ -71,14 +72,18 @@ export interface FetchApartmentsByBlockParams {
  * Pattern: GET /getInvoicesList?complexId=UUID&status=PENDING&limit=20&cursor=...
  */
 export const fetchInvoices = async ({ token, complexId, options }: FetchInvoicesParams) => {
-  // Construimos los query parameters EXACTAMENTE como los espera el backend
   const opts = options ?? {};
   const queryParams = new URLSearchParams({
-    complexId, // Supongo que pasas el complexId así o en la URL
-    page: (opts.cursor || 1).toString(), // Trataremos el cursor como número de página
-    pageSize: '25', // El límite que acepta tu backend
-    ...(opts.status !== 'ALL' && { status: opts.status }),
-    ...(opts.apartmentSearch && { apartmentSearch: opts.apartmentSearch })
+    complexId,
+    page: (opts.cursor || 1).toString(),
+    pageSize: '25',
+    ...(opts.status && opts.status !== 'ALL' && { status: opts.status }),
+    ...(opts.blockSearch && { blockSearch: opts.blockSearch }),
+    ...(opts.apartmentSearch && { apartmentSearch: opts.apartmentSearch }),
+    ...(opts.periodMonth && { periodMonth: opts.periodMonth.toString() }),
+    ...(opts.periodYear && { periodYear: opts.periodYear.toString() }),
+    ...(opts.startDate && { dueDateFrom: opts.startDate }),
+    ...(opts.endDate && { dueDateTo: opts.endDate }),
   });
 
   const response = await fetch(`${API_URL}/getListInvoice?${queryParams}`, {
@@ -91,10 +96,8 @@ export const fetchInvoices = async ({ token, complexId, options }: FetchInvoices
   
   const result = await response.json();
 
-  // Mapeamos la respuesta del backend a lo que espera tu componente de React
   return {
     invoices: result.data || [],
-    // Si la página actual es menor que el total de páginas, el "nextCursor" será la página siguiente
     nextCursor: result.pagination.page < result.pagination.totalPages 
       ? (result.pagination.page + 1).toString() 
       : null,
@@ -447,6 +450,55 @@ export const fetchApartmentsByBlock = async ({
     console.error('Error en fetchApartmentsByBlock:', error);
     return [];
   }
+};
+
+// ==================== GET: All Invoices for Export ====================
+
+export interface FetchAllInvoicesForExportParams {
+  token: string;
+  complexId: string;
+  options?: Omit<IInvoicesFilterOptions, 'cursor' | 'limit'> & {
+    limitPerPage?: number;
+    maxPages?: number;
+    maxRecords?: number;
+  };
+}
+
+/**
+ * Fetch all invoices matching filters, traversing all pages.
+ * Used for Excel export.
+ */
+export const fetchAllInvoicesForExport = async ({
+  token,
+  complexId,
+  options = {},
+}: FetchAllInvoicesForExportParams) => {
+  const { limitPerPage = 200, maxPages = 200, maxRecords, ...filters } = options;
+
+  const aggregated: IInvoice[] = [];
+  let cursor: string | null = null;
+  let pageCount = 0;
+
+  do {
+    const remainingRecords = maxRecords ? Math.max(maxRecords - aggregated.length, 0) : null;
+    if (remainingRecords === 0) break;
+
+    const result = await fetchInvoices({
+      token,
+      complexId,
+      options: {
+        ...filters,
+        limit: remainingRecords ? Math.min(limitPerPage, remainingRecords) : limitPerPage,
+        cursor: cursor ?? '1',
+      },
+    });
+
+    aggregated.push(...result.invoices);
+    cursor = result.nextCursor;
+    pageCount += 1;
+  } while (cursor && pageCount < maxPages && (!maxRecords || aggregated.length < maxRecords));
+
+  return maxRecords ? aggregated.slice(0, maxRecords) : aggregated;
 };
 
 // ==================== POST: Bulk Create Invoices ====================

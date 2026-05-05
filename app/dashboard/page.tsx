@@ -29,7 +29,11 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { getDashboardData, DashboardData } from "@/services/dashboard.service";
+import {
+  getDashboardData,
+  DashboardData,
+  DelinquencyAgingBucket,
+} from "@/services/dashboard.service";
 
 // --- Interfaces para Tipado Estricto ---
 interface StatCardProps {
@@ -47,6 +51,7 @@ interface ChartContainerProps {
   icon: React.ReactNode;
   children: (width: number) => React.ReactNode;
   loading?: boolean;
+  contentClassName?: string;
 }
 
 // --- Formateadores ---
@@ -129,6 +134,7 @@ const ChartContainer = ({
   icon,
   children,
   loading,
+  contentClassName,
 }: ChartContainerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -154,7 +160,11 @@ const ChartContainer = ({
           <Filter size={18} />
         </div>
       </div>
-      <div ref={containerRef} className="w-full h-[320px] relative">
+      <div
+        ref={containerRef}
+        className={`w-full relative ${contentClassName || "h-[320px]"}`}
+        style={contentClassName === "auto" ? { height: "auto" } : undefined}
+      >
         {loading ? (
           <div className="w-full h-full bg-slate-50 animate-pulse rounded-xl border border-slate-100 flex flex-col p-4 space-y-4 text-center justify-center text-slate-400 text-sm italic">
             Cargando métricas...
@@ -171,7 +181,7 @@ const ChartContainer = ({
 
 export default function Dashboard() {
   const { activeComplex } = useAppSelector((state) => state.complex);
-  const { token } = useAppSelector((state) => state.auth);
+  const { token, user } = useAppSelector((state) => state.auth);
 
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
     null,
@@ -204,9 +214,15 @@ export default function Dashboard() {
       ingresos: dashboardData?.charts.financialBalance || [],
       estadoPagos: dashboardData?.charts.paymentStatus || [],
       ocupacionBloque: dashboardData?.charts.blockOccupation || [],
+      antiguedadMora: dashboardData?.charts.delinquencyAging || [],
     }),
     [dashboardData],
   );
+
+  const canViewCouncilSection =
+    user?.role === "ADMIN" ||
+    user?.grantedRoles.includes("COUNCIL_MEMBER") ||
+    user?.permissions.includes("dashboard.council.view");
 
   if (error) {
     return (
@@ -291,6 +307,50 @@ export default function Dashboard() {
             href="/dashboard/pqrs"
           />
         </div>
+
+        {canViewCouncilSection && dashboardData?.council?.canView && (
+          <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-6 shadow-sm">
+            <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+                  Consejo
+                </p>
+                <h2 className="text-2xl font-extrabold text-slate-900">Vista prioritaria del consejo</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Resumen rápido de miembros activos y propietarios con cartera pendiente del periodo actual.
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                <Activity className="h-3.5 w-3.5" />
+                Acceso especial habilitado
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <StatCard
+                label="Miembros del consejo"
+                loading={loading}
+                value={dashboardData.council.summary.membersCount}
+                icon={<Users />}
+                color="from-amber-500 to-orange-500"
+              />
+              <StatCard
+                label="Propietarios activos"
+                loading={loading}
+                value={dashboardData.council.summary.ownerCount}
+                icon={<Home />}
+                color="from-slate-700 to-slate-900"
+              />
+              <StatCard
+                label="Propietarios en mora"
+                loading={loading}
+                value={dashboardData.council.summary.overdueOwners}
+                icon={<AlertCircle />}
+                color="from-rose-500 to-rose-600"
+              />
+            </div>
+          </section>
+        )}
 
         {/* Balance Financiero */}
         <div className="grid grid-cols-1 gap-8">
@@ -531,6 +591,108 @@ export default function Dashboard() {
                 />
               </BarChart>
             )}
+          </ChartContainer>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8">
+          <ChartContainer
+            title="Antigüedad de Mora"
+            icon={<AlertCircle className="text-rose-600" />}
+            loading={loading || !isClient}
+            contentClassName="auto"
+          >
+            {(width) => {
+              const isMobile = width < 480;
+              const chartHeight = isMobile ? 220 : 260;
+              const yAxisWidth = isMobile ? 58 : 72;
+
+              return (
+                <div className="flex h-full flex-col gap-3">
+                  <BarChart
+                    width={width}
+                    height={chartHeight}
+                    data={chartData.antiguedadMora}
+                    margin={{ left: -10, right: 10, top: 10, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f1f5f9"
+                    />
+                    <XAxis
+                      dataKey="range"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#64748b", fontSize: isMobile ? 10 : 12 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#64748b", fontSize: isMobile ? 10 : 11 }}
+                      width={yAxisWidth}
+                      tickFormatter={(value: number) => {
+                        if (value >= 1000000) {
+                          return `$ ${(value / 1000000).toFixed(1)}M`;
+                        }
+                        if (value >= 1000) {
+                          return `$ ${(value / 1000).toFixed(0)}K`;
+                        }
+                        return `$ ${value}`;
+                      }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "#fff1f2" }}
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: "0 8px 20px rgba(15, 23, 42, 0.12)",
+                      }}
+                      formatter={(value: unknown, name: unknown, props: { payload?: DelinquencyAgingBucket }) => {
+                        const numericValue = typeof value === "number" ? value : Number(value || 0);
+                        const metricName = typeof name === "string" ? name : String(name || "");
+
+                        if (name === "amount") {
+                          const apartments = props.payload?.apartments || 0;
+                          return [
+                            `${currencyFormatter.format(numericValue)} | ${apartments} aptos`,
+                            "Saldo vencido",
+                          ];
+                        }
+                        return [numericValue, metricName];
+                      }}
+                      labelFormatter={(label: unknown) => `Rango: ${String(label ?? "")}`}
+                    />
+                    <Bar
+                      dataKey="amount"
+                      name="Saldo vencido"
+                      radius={[8, 8, 0, 0]}
+                      barSize={Math.max(34, width / 12)}
+                    >
+                      {chartData.antiguedadMora.map((bucket: DelinquencyAgingBucket) => (
+                        <Cell key={bucket.range} fill={bucket.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    {chartData.antiguedadMora.map((bucket: DelinquencyAgingBucket) => (
+                      <div
+                        key={`summary-${bucket.range}`}
+                        className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"
+                      >
+                        <p className="text-xs font-semibold text-slate-600">{bucket.range}</p>
+                        <p className="text-sm font-bold text-slate-900">
+                          {currencyFormatter.format(bucket.amount)}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          {bucket.apartments} apartamentos
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }}
           </ChartContainer>
         </div>
       </main>

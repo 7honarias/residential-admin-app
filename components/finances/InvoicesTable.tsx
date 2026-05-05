@@ -109,7 +109,7 @@ export default function InvoicesTable({ invoices, onRowClick }: Props) {
                 >
                   {/* Apartamento */}
                   <td className="px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium text-slate-900">
-                    {invoice.block_number ? `${invoice.block_number}-` : ''}{invoice.apartment_number}
+                    {invoice.block_number ? `${invoice.block_number}-${invoice.apartment_number}` : invoice.apartment_number}
                   </td>
 
                   {/* Concepto */}

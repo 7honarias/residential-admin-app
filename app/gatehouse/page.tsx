@@ -14,10 +14,13 @@ import { PackageCard } from "@/components/packages/PackageCard";
 import { CreatePackageModal } from "@/components/packages/CreatePackageModal";
 import { DeliverPackageModal } from "@/components/packages/DeliverPackageModal";
 import VehicleControlPanel from "@/components/parkings/VehicleControlPanel";
+import VisitorParkingLogsTable from "@/components/parkings/VisitorParkingLogsTable";
 import DigitalLogbookModule from "@/components/gatehouse/DigitalLogbookModule";
+import AmenitiesAgendaPanel from "../../components/gatehouse/AmenitiesAgendaPanel";
+import VisitorLookupPanel from "@/components/gatehouse/VisitorLookupPanel";
 
 // Tipos para simular nuestra base de datos
-type TabType = "VISITORS" | "VEHICLES" | "PACKAGES" | "LOGS";
+type TabType = "VISITORS" | "VEHICLES" | "AMENITIES" | "PACKAGES" | "LOGS";
 
 export default function GatehouseDashboard() {
   const router = useRouter();
@@ -174,6 +177,7 @@ export default function GatehouseDashboard() {
             {[
               { id: "VISITORS", icon: "🚶", label: "Visitantes" },
               { id: "VEHICLES", icon: "🚗", label: "Vehículos" },
+                { id: "AMENITIES", icon: "🏓", label: "Amenities" },
               { id: "PACKAGES", icon: "📦", label: "Paquetes" },
               { id: "LOGS", icon: "📝", label: "Bitácora" },
             ].map((tab) => (
@@ -196,46 +200,53 @@ export default function GatehouseDashboard() {
             
             {/* --- VISITANTES --- */}
             {activeTab === "VISITORS" && (
-              <div className="animate-fade-in max-w-5xl mx-auto">
-                <h2 className="text-3xl font-bold text-slate-800 mb-8 text-center">
-                  Registrar Ingreso de Visitante
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <button className="p-10 border-2 border-dashed border-slate-300 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50 transition flex flex-col items-center justify-center gap-6 group">
-                    <div className="w-24 h-24 bg-slate-100 group-hover:bg-white rounded-full flex items-center justify-center text-5xl shadow-sm transition-transform group-hover:scale-110">
-                      🛵
-                    </div>
-                    <span className="font-bold text-xl text-slate-700 group-hover:text-indigo-700">
-                      Domicilio / Delivery
-                    </span>
-                  </button>
-                  <button className="p-10 border-2 border-dashed border-slate-300 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50 transition flex flex-col items-center justify-center gap-6 group">
-                    <div className="w-24 h-24 bg-slate-100 group-hover:bg-white rounded-full flex items-center justify-center text-5xl shadow-sm transition-transform group-hover:scale-110">
-                      👨‍👩‍👧
-                    </div>
-                    <span className="font-bold text-xl text-slate-700 group-hover:text-emerald-700">
-                      Visita Familiar / Personal
-                    </span>
-                  </button>
-                  <button className="p-10 border-2 border-dashed border-slate-300 rounded-2xl hover:border-amber-500 hover:bg-amber-50 transition flex flex-col items-center justify-center gap-6 group md:col-span-2 lg:col-span-1">
-                    <div className="w-24 h-24 bg-slate-100 group-hover:bg-white rounded-full flex items-center justify-center text-5xl shadow-sm transition-transform group-hover:scale-110">
-                      🛠️
-                    </div>
-                    <span className="font-bold text-xl text-slate-700 group-hover:text-amber-700">
-                      Contratista / Soporte
-                    </span>
-                  </button>
-                </div>
+              <div className="animate-fade-in">
+                {token && complexId ? (
+                  <VisitorLookupPanel
+                    token={token}
+                    complexId={complexId}
+                    securityUserId={user?.id ?? ""}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
+                    <p className="text-xl font-medium text-amber-800">
+                      Inicia sesión y selecciona un conjunto para consultar invitaciones.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
             {/* --- VEHÍCULOS --- */}
             {activeTab === 'VEHICLES' && (
-              <div className="animate-fade-in flex justify-center">
-                 <div className="w-full max-w-4xl">
-                    {/* Al tener más ancho, tu VehicleControlPanel se verá mucho más imponente */}
+              <div className="animate-fade-in space-y-10">
+                {/* Panel de control: registro de ingreso/salida */}
+                <div className="flex justify-center">
+                  <div className="w-full max-w-4xl">
                     <VehicleControlPanel />
-                 </div>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="border-t border-slate-200" />
+
+                {/* Tabla histórica de vehículos visitantes del día */}
+                <VisitorParkingLogsTable />
+              </div>
+            )}
+
+            {/* --- AMENITIES --- */}
+            {activeTab === "AMENITIES" && (
+              <div className="animate-fade-in">
+                {token && complexId ? (
+                  <AmenitiesAgendaPanel token={token} complexId={complexId} />
+                ) : (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
+                    <p className="text-xl font-medium text-amber-800">
+                      Inicia sesión y selecciona un conjunto para consultar la agenda de amenities.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

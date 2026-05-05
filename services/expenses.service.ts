@@ -1,4 +1,5 @@
 import { generateIdempotencyKey } from '@/lib/utils';
+import type { IExpense } from '@/app/dashboard/finances/expenses/expenses.types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -9,6 +10,18 @@ export interface FetchExpensesOptions {
   search?: string;
   cursor?: string;
   limit?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface FetchAllExpensesForExportParams {
+  token: string;
+  complexId: string;
+  options?: Omit<FetchExpensesOptions, 'cursor' | 'limit'> & {
+    limitPerPage?: number;
+    maxPages?: number;
+    maxRecords?: number;
+  };
 }
 
 export interface FetchExpensesParams {
@@ -98,7 +111,9 @@ export const fetchExpenses = async ({ token, complexId, options }: FetchExpenses
     page: (opts.cursor || 1).toString(),
     pageSize: (opts.limit || 25).toString(),
     ...(opts.status !== 'ALL' && { status: opts.status }),
-    ...(opts.search && { search: opts.search })
+    ...(opts.search && { search: opts.search }),
+    ...(opts.startDate && { startDate: opts.startDate }),
+    ...(opts.endDate && { endDate: opts.endDate }),
   });
 
   const response = await fetch(`${API_URL}/getExpensesList?${queryParams}`, {
@@ -217,4 +232,44 @@ export const createExpense = async ({ token, complexId, payload }: CreateExpense
     console.error('Error en createExpense:', error);
     throw error;
   }
+};
+
+// ==================== GET: All Expenses for Export ====================
+
+/**
+ * Fetch all expenses matching filters, traversing all pages.
+ * Useful for Excel exports without pagination limits.
+ */
+export const fetchAllExpensesForExport = async ({
+  token,
+  complexId,
+  options = {},
+}: FetchAllExpensesForExportParams): Promise<IExpense[]> => {
+  const { limitPerPage = 200, maxPages = 200, maxRecords, ...filters } = options;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const aggregated: any[] = [];
+  let cursor: string | null = null;
+  let pageCount = 0;
+
+  do {
+    const remaining = maxRecords ? Math.max(maxRecords - aggregated.length, 0) : null;
+    if (remaining === 0) break;
+
+    const result = await fetchExpenses({
+      token,
+      complexId,
+      options: {
+        ...filters,
+        limit: remaining ? Math.min(limitPerPage, remaining) : limitPerPage,
+        cursor: cursor ?? undefined,
+      },
+    });
+
+    aggregated.push(...result.expenses);
+    cursor = result.nextCursor;
+    pageCount += 1;
+  } while (cursor && pageCount < maxPages && (!maxRecords || aggregated.length < maxRecords));
+
+  return maxRecords ? aggregated.slice(0, maxRecords) : aggregated;
 };

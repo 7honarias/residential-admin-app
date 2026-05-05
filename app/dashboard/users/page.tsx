@@ -1,33 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Plus, Shield, UserCog, UserX, Users, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Search, Shield, UserCog, UserX, Users, X } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
 import {
+  assignCouncilMembers,
+  CouncilOwner,
+  fetchCouncilOwners,
+  revokeCouncilMembers,
+} from '@/services/council.service';
+import {
   ComplexUser,
-  createComplexUser,
   deactivateComplexUser,
   fetchComplexUsers,
-  StaffRole,
 } from '@/services/users.service';
-
-interface UserFormState {
-  fullName: string;
-  email: string;
-  phone: string;
-  documentTypeCode: string;
-  documentNumber: string;
-  role: StaffRole;
-}
-
-const INITIAL_FORM: UserFormState = {
-  fullName: '',
-  email: '',
-  phone: '',
-  documentTypeCode: 'CC',
-  documentNumber: '',
-  role: 'SECURITY',
-};
 
 function getInitials(name: string): string {
   return name
@@ -101,16 +87,25 @@ function ConfirmDeactivateModal({ user, isLoading, onConfirm, onCancel }: Confir
 
 export default function UsersPage() {
   const token = useAppSelector((state) => state.auth.token);
+  const user = useAppSelector((state) => state.auth.user);
   const complexId = useAppSelector((state) => state.complex.activeComplex?.id);
+  const isAdmin = user?.role === 'ADMIN';
 
-  const [form, setForm] = useState<UserFormState>(INITIAL_FORM);
   const [users, setUsers] = useState<ComplexUser[]>([]);
+  const [councilOwners, setCouncilOwners] = useState<CouncilOwner[]>([]);
+  const [documentSearch, setDocumentSearch] = useState('');
+  const [selectedOwner, setSelectedOwner] = useState<CouncilOwner | null>(null);
+  
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingCouncilOwners, setIsLoadingCouncilOwners] = useState(false);
+  const [isUpdatingCouncil, setIsUpdatingCouncil] = useState(false);
+  
   const [listError, setListError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [councilError, setCouncilError] = useState<string | null>(null);
+  const [councilFeedback, setCouncilFeedback] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   // Deactivation state
   const [confirmUser, setConfirmUser] = useState<ComplexUser | null>(null);
@@ -119,15 +114,6 @@ export default function UsersPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-
-  const updateField = <K extends keyof UserFormState>(field: K, value: UserFormState[K]) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const resetMessages = () => {
-    setError(null);
-    setSuccess(null);
-  };
 
   const loadUsers = useCallback(async () => {
     if (!token || !complexId) return;
@@ -145,245 +131,136 @@ export default function UsersPage() {
     }
   }, [token, complexId]);
 
+  const searchCouncilOwners = useCallback(async () => {
+    if (!token || !complexId || !isAdmin) return;
+
+    const normalizedDocument = documentSearch.replace(/\D/g, '');
+    if (!normalizedDocument) {
+      setCouncilError('Debes ingresar una cédula para buscar.');
+      setCouncilOwners([]);
+      setSelectedOwner(null);
+      return;
+    }
+
+    setIsLoadingCouncilOwners(true);
+    setCouncilError(null);
+
+    try {
+      const owners = await fetchCouncilOwners(token, complexId, normalizedDocument);
+      setCouncilOwners(owners);
+      setSelectedOwner(owners[0] || null);
+    } catch (loadError) {
+      setCouncilError(
+        loadError instanceof Error ? loadError.message : 'No fue posible buscar propietarios por cédula.',
+      );
+    } finally {
+      setIsLoadingCouncilOwners(false);
+    }
+  }, [token, complexId, isAdmin, documentSearch]);
+
   useEffect(() => {
     if (token && complexId) {
       loadUsers();
     }
   }, [token, complexId, loadUsers]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!token || !complexId) {
-      setError('No hay sesión activa o conjunto seleccionado.');
+  const handleCouncilMutation = async (action: 'assign' | 'revoke') => {
+    if (!token || !complexId || !isAdmin || !selectedOwner) {
+      if (!selectedOwner) {
+        setCouncilFeedback({
+          type: 'error',
+          text: 'Busca y selecciona un propietario por cédula.',
+        });
+      }
       return;
     }
 
-    resetMessages();
-    setIsSubmitting(true);
-
-    try {
-      const response = await createComplexUser(token, complexId, form);
-      setSuccess(response.message);
-      setForm((prev) => ({ ...INITIAL_FORM, role: prev.role }));
-      await loadUsers();
-      setIsCreateOpen(false);
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'No fue posible crear el usuario.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDeactivateConfirm = async () => {
-    if (!token || !complexId || !confirmUser) return;
-
-    setIsDeactivating(true);
-    setDeactivateFeedback(null);
-
-    try {
-      const response = await deactivateComplexUser(token, complexId, confirmUser.profileId, confirmUser.role);
-      setDeactivateFeedback({ type: 'success', text: response.message });
-      await loadUsers();
-    } catch (err) {
-      setDeactivateFeedback({
+    if (action === 'assign' && selectedOwner.isCouncilMember) {
+      setCouncilFeedback({
         type: 'error',
-        text: err instanceof Error ? err.message : 'No fue posible desactivar el usuario.',
+        text: 'El propietario ya es miembro activo del consejo.',
+      });
+      return;
+    }
+
+    if (action === 'revoke' && !selectedOwner.isCouncilMember) {
+      setCouncilFeedback({
+        type: 'error',
+        text: 'El propietario seleccionado no es miembro activo del consejo.',
+      });
+      return;
+    }
+
+    const profileIds = [selectedOwner.profileId];
+
+    setIsUpdatingCouncil(true);
+    setCouncilFeedback(null);
+
+    try {
+      const response =
+        action === 'assign'
+          ? await assignCouncilMembers(token, complexId, profileIds)
+          : await revokeCouncilMembers(token, complexId, profileIds);
+
+      setCouncilFeedback({
+        type: 'success',
+        text:
+          response.message ||
+          (action === 'assign'
+            ? 'Miembros del consejo asignados correctamente.'
+            : 'Miembros del consejo removidos correctamente.'),
+      });
+      await searchCouncilOwners();
+    } catch (mutationError) {
+      setCouncilFeedback({
+        type: 'error',
+        text:
+          mutationError instanceof Error
+            ? mutationError.message
+            : 'No fue posible actualizar la composición del consejo.',
       });
     } finally {
-      setIsDeactivating(false);
-      setConfirmUser(null);
+      setIsUpdatingCouncil(false);
     }
   };
 
-  if (!token || !complexId) {
-    return (
-      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-800">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="h-5 w-5" />
-          <p className="text-sm font-medium">Selecciona un conjunto activo para gestionar usuarios.</p>
-        </div>
-      </div>
-    );
-  }
+  const handleConfirmDeactivate = async () => {
+    if (!confirmUser || !token || !complexId) return;
+    
+    setIsDeactivating(true);
+    try {
+       // Llamada real al servicio
+       await deactivateComplexUser(token, complexId, confirmUser.profileId, confirmUser.role);
+       setDeactivateFeedback({ type: 'success', text: 'Usuario desactivado exitosamente.' });
+       await loadUsers(); // Recargamos la tabla para reflejar el cambio
+    } catch (err) {
+       setDeactivateFeedback({ 
+         type: 'error', 
+         text: err instanceof Error ? err.message : 'Error al desactivar al usuario.' 
+       });
+    } finally {
+       setIsDeactivating(false);
+       setConfirmUser(null);
+    }
+  };
 
   return (
     <>
+      {/* Renderizado Condicional del Modal */}
       {confirmUser && (
         <ConfirmDeactivateModal
           user={confirmUser}
           isLoading={isDeactivating}
-          onConfirm={handleDeactivateConfirm}
+          onConfirm={handleConfirmDeactivate}
           onCancel={() => setConfirmUser(null)}
         />
       )}
 
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Gestión de Usuarios Internos</h1>
-              <p className="mt-1 text-sm text-slate-600">
-                Administra personal de seguridad y staff del conjunto.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                resetMessages();
-                setIsCreateOpen((prev) => !prev);
-              }}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4" />
-              {isCreateOpen ? 'Cerrar formulario' : 'Crear usuario'}
-            </button>
-          </div>
-        </div>
-
-        {/* Create form */}
-        {isCreateOpen && (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
-                    <Shield className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Seguridad</h2>
-                    <p className="text-xs text-slate-500">Personal de portería y control de accesos.</p>
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
-                    <UserCog className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Staff</h2>
-                    <p className="text-xs text-slate-500">Equipo administrativo y operativo.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
-                <label className="flex flex-col gap-1 text-sm text-slate-700 md:col-span-2">
-                  Nombre completo
-                  <input
-                    type="text"
-                    required
-                    value={form.fullName}
-                    onChange={(e) => updateField('fullName', e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
-                    placeholder="Ej: Laura Gómez"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-1 text-sm text-slate-700">
-                  Correo electrónico
-                  <input
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(e) => updateField('email', e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
-                    placeholder="nombre@correo.com"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-1 text-sm text-slate-700">
-                  Teléfono
-                  <input
-                    type="tel"
-                    required
-                    value={form.phone}
-                    onChange={(e) => updateField('phone', e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
-                    placeholder="3001234567"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-1 text-sm text-slate-700">
-                  Tipo de documento
-                  <select
-                    value={form.documentTypeCode}
-                    onChange={(e) => updateField('documentTypeCode', e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
-                  >
-                    <option value="CC">CC</option>
-                    <option value="CE">CE</option>
-                    <option value="NIT">NIT</option>
-                    <option value="PAS">PAS</option>
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-1 text-sm text-slate-700">
-                  Número de documento
-                  <input
-                    type="text"
-                    required
-                    value={form.documentNumber}
-                    onChange={(e) => updateField('documentNumber', e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
-                    placeholder="1020304050"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-1 text-sm text-slate-700 md:col-span-2">
-                  Rol
-                  <select
-                    value={form.role}
-                    onChange={(e) => updateField('role', e.target.value as StaffRole)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
-                  >
-                    <option value="SECURITY">Seguridad</option>
-                    <option value="STAFF">Staff</option>
-                  </select>
-                </label>
-
-                {error && (
-                  <div className="md:col-span-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-                    {error}
-                  </div>
-                )}
-
-                {success && (
-                  <div className="md:col-span-2 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>{success}</span>
-                  </div>
-                )}
-
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsCreateOpen(false)}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isSubmitting ? 'Creando usuario...' : 'Crear usuario'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </>
-        )}
-
+      <div className="flex flex-col gap-6">
         {/* User list */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Lista de usuarios</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Lista de colaboradores</h2>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
               {users.length} registrados
             </span>
@@ -499,6 +376,179 @@ export default function UsersPage() {
             </div>
           )}
         </div>
+
+        {isAdmin && (
+          <div className="rounded-xl border border-amber-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Miembros del Consejo</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Busca al propietario por cédula para asignar o revocar su acceso especial al dashboard.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                  Resultado: {councilOwners.length}
+                </span>
+                <button
+                  type="button"
+                  disabled={isUpdatingCouncil || !selectedOwner || selectedOwner.isCouncilMember}
+                  onClick={() => handleCouncilMutation('assign')}
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isUpdatingCouncil ? 'Procesando...' : 'Asignar consejo'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isUpdatingCouncil || !selectedOwner || !selectedOwner.isCouncilMember}
+                  onClick={() => handleCouncilMutation('revoke')}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Revocar consejo
+                </button>
+              </div>
+            </div>
+
+            <form
+              className="mb-4 grid gap-3 sm:grid-cols-[1fr_auto]"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setCouncilFeedback(null);
+                searchCouncilOwners();
+              }}
+            >
+              <label className="flex flex-col gap-1 text-sm text-slate-700">
+                Cédula del propietario
+                <input
+                  type="text"
+                  value={documentSearch}
+                  onChange={(event) => setDocumentSearch(event.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-amber-500"
+                  placeholder="Ej: 1020304050"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={isLoadingCouncilOwners}
+                className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Search className="h-4 w-4" />
+                {isLoadingCouncilOwners ? 'Buscando...' : 'Buscar por cédula'}
+              </button>
+            </form>
+
+            {councilFeedback && (
+              <div
+                className={`mb-4 flex items-center gap-2 rounded-lg border p-3 text-sm ${
+                  councilFeedback.type === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-rose-200 bg-rose-50 text-rose-700'
+                }`}
+              >
+                {councilFeedback.type === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                )}
+                <span>{councilFeedback.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setCouncilFeedback(null)}
+                  className="ml-auto rounded p-0.5 transition hover:bg-black/10"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            {councilError && (
+              <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                {councilError}
+              </div>
+            )}
+
+            {isLoadingCouncilOwners ? (
+              <div className="text-sm text-slate-600">Cargando propietarios...</div>
+            ) : councilOwners.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 py-10 text-center text-sm text-slate-600">
+                No se encontró ningún propietario activo con esa cédula en el conjunto.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Propietario
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Cédula
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Apartamento
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Contacto
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Estado
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {/* Filtrar duplicados por profileId+apartmentId */}
+                    {Array.from(
+                      new Map(
+                        councilOwners.map((owner) => [
+                          `${owner.profileId}-${owner.apartmentId ?? ''}`,
+                          owner,
+                        ])
+                      ).values()
+                    ).map((owner) => {
+                      const isSelected =
+                        selectedOwner &&
+                        selectedOwner.profileId === owner.profileId &&
+                        selectedOwner.apartmentId === owner.apartmentId;
+                      return (
+                        <tr
+                          key={`${owner.profileId}-${owner.apartmentId ?? ''}`}
+                          className={`transition hover:bg-amber-50 cursor-pointer ${isSelected ? 'ring-2 ring-amber-400 bg-amber-50' : ''}`}
+                          onClick={() => setSelectedOwner(owner)}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
+                                {getInitials(owner.fullName)}
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-slate-900">{owner.fullName}</div>
+                                <div className="text-xs text-slate-500">{owner.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700">{owner.documentNumber || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700">{owner.apartmentLabel}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700">{owner.phone || 'Sin teléfono'}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                owner.isCouncilMember
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {owner.isCouncilMember ? 'Miembro activo' : 'Propietario elegible'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );

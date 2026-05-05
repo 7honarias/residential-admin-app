@@ -1,8 +1,10 @@
 
 export interface Amenity {
   id: string;
+  complex_id?: string;
   name: string;
   description: string;
+  image_url?: string | null;
   capacity: number;
   booking_mode: "TIME_SLOT" | "FULL_DAY";
   pricing_type: "PER_HOUR" | "FREE";
@@ -26,6 +28,7 @@ export interface Schedule {
 export interface AmenityFormData {
   name: string;
   description: string;
+  image_url?: string | null;
   capacity: number;
   booking_mode: BookingMode;
   pricing_type: PricingType;

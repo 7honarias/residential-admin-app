@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Calendar,
   Clock,
@@ -182,6 +183,7 @@ export default function AmenityDetailsPage() {
       const amenityData = {
         name: updatedAmenity.name,
         description: updatedAmenity.description,
+        image_url: updatedAmenity.image_url || null,
         capacity: updatedAmenity.capacity,
         price: updatedAmenity.price,
         slot_duration: updatedAmenity.slot_duration,
@@ -247,6 +249,20 @@ export default function AmenityDetailsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* COLUMNA INFO */}
         <div className="lg:col-span-1 space-y-6">
+          {amenity?.image_url && (
+            <section className="bg-white rounded-3xl border border-slate-100 p-3 shadow-sm">
+              <div className="h-48 w-full overflow-hidden rounded-2xl border border-slate-100">
+                <Image
+                  src={amenity.image_url}
+                  alt={`Imagen de ${amenity.name}`}
+                  width={960}
+                  height={384}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </section>
+          )}
+
           {/* CARACTERISTICAS PRINCIPALES */}
           <section className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
             <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-sm uppercase tracking-wider">

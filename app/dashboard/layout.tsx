@@ -57,9 +57,17 @@ export default function DashboardLayout({
       return;
     }
     if (user === null) return; // still loading — wait
-    const allowedRoles = ["ADMIN", "STAFF"];
-    if (!allowedRoles.includes(user.role)) {
+    const hasFullDashboardAccess = ["ADMIN", "STAFF"].includes(user.role);
+    const hasCouncilDashboardAccess =
+      user.grantedRoles.includes("COUNCIL_MEMBER") || user.permissions.includes("dashboard.access");
+
+    if (!hasFullDashboardAccess && !hasCouncilDashboardAccess) {
       router.replace(user.role === "SECURITY" ? "/gatehouse" : "/login");
+      return;
+    }
+
+    if (!hasFullDashboardAccess && pathname !== "/dashboard") {
+      router.replace("/dashboard");
     }
   }, [isAuthenticated, token, user, router, pathname]);
 

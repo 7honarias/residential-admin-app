@@ -81,24 +81,28 @@ export interface IManualPaymentResponse {
 }
 
 /**
+ * IInvoicesFilterOptions - Opciones de filtrado (para servicio)
+ */
+export interface IInvoicesFilterOptions {
+  status?: InvoiceStatus | 'ALL'; // Filtro de estado
+  blockSearch?: string; // Búsqueda por nombre de bloque/torre
+  apartmentSearch?: string; // Búsqueda por número de apartamento
+  periodMonth?: number; // 1-12: mes de la factura
+  periodYear?: number; // Año de la factura
+  startDate?: string; // YYYY-MM-DD: due_date >= startDate
+  endDate?: string; // YYYY-MM-DD: due_date <= endDate
+  limit?: number; // Paginación
+  cursor?: string | null; // Cursor para siguiente página
+  order?: 'asc' | 'desc'; // Orden por due_date
+}
+
+/**
  * IInvoicesListResponse - Respuesta del GET invoices list
  */
 export interface IInvoicesListResponse {
   invoices: IInvoice[];
   nextCursor: string | null;
-  totalCount?: number; // Opcional: para mostrar "X de 50"
-  error?: string;
-}
-
-/**
- * IInvoicesFilterOptions - Opciones de filtrado (para servicio)
- */
-export interface IInvoicesFilterOptions {
-  status?: InvoiceStatus | 'ALL'; // Filtro de estado
-  apartmentSearch?: string; // Búsqueda por número de apartamento
-  limit?: number; // Paginación
-  cursor?: string | null; // Cursor para siguiente página
-  order?: 'asc' | 'desc'; // Orden por due_date
+  totalCount?: number;
 }
 
 /**

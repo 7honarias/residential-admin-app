@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAppSelector } from "@/store/hooks";
-import { AlertCircle, Save, Loader, Settings, Receipt, ShieldCheck } from "lucide-react";
+import { AlertCircle, Save, Loader, Settings, Receipt, ShieldCheck, CreditCard } from "lucide-react";
 import CoefficientPricingTable from "@/components/settings/CoefficientPricingTable";
 import FinancialSettingsForm from "@/components/settings/FinancialSettingsForm";
 import BillingConfigForm, { BillingConfig as BillingConfigFormData } from "@/components/settings/BillingConfigForm";
@@ -21,6 +23,7 @@ type ActiveTab = "administration" | "billing" | "security";
 export default function SettingsPage() {
   const { activeComplex } = useAppSelector((state) => state.complex);
   const { token } = useAppSelector((state) => state.auth);
+  const pathname = usePathname();
   
   const [activeTab, setActiveTab] = useState<ActiveTab>("administration");
   
@@ -188,6 +191,19 @@ export default function SettingsPage() {
             <ShieldCheck className="w-5 h-5" />
             Seguridad
           </button>
+
+          {/* TAB: SUSCRIPCIÓN VESTAP */}
+          <Link
+            href="/dashboard/settings/subscription"
+            className={`flex items-center gap-2 px-6 py-4 font-medium border-b-2 transition-colors ${
+              pathname === "/dashboard/settings/subscription"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <CreditCard className="w-5 h-5" />
+            Suscripción
+          </Link>
         </div>
 
         {/* Alertas */}

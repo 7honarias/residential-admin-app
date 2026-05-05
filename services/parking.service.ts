@@ -198,3 +198,48 @@ export const registerVehicleAccess = async ({
 
   return parseApiResponse(response, `Error executing ${action}`);
 };
+
+export interface VisitorParkingLogItem {
+  id: string;
+  plate: string;
+  parking_number: string;
+  entry_time: string;
+  exit_time: string | null;
+  duration_minutes: number | null;
+  fee_amount: number;
+  payment_method: "CASH" | "POS" | null;
+  status: "ACTIVE" | "COMPLETED";
+  observations: string | null;
+}
+
+export interface FetchVisitorParkingLogsParams {
+  token: string;
+  complexId: string;
+  date?: string; // ISO date YYYY-MM-DD, defaults to today
+  limit?: number;
+  cursor?: string;
+}
+
+export const fetchVisitorParkingLogs = async ({
+  token,
+  complexId,
+  date,
+  limit = 50,
+  cursor,
+}: FetchVisitorParkingLogsParams): Promise<{
+  items: VisitorParkingLogItem[];
+  nextCursor: string | null;
+  date: string;
+}> => {
+  const params = new URLSearchParams({ complexId, limit: String(limit) });
+  if (date) params.set("date", date);
+  if (cursor) params.set("cursor", cursor);
+
+  const response = await fetch(`${API_URL}/registerParkingMovement?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return parseApiResponse(response, "Error cargando registros de vehículos visitantes");
+};

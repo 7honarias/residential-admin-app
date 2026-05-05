@@ -5,6 +5,8 @@ export interface Membership {
   apartment_id: string | null;
   role: string;
   is_active: boolean;
+  granted_roles: string[];
+  permissions: string[];
 }
 
 interface User {
@@ -13,6 +15,8 @@ interface User {
   email: string;
   role: string;
   memberships: Membership[];
+  grantedRoles: string[];
+  permissions: string[];
 }
 
 interface AuthState {
@@ -44,6 +48,25 @@ const authSlice = createSlice({
         state.user.role = action.payload;
       }
     },
+    syncComplexAccess: (state, action: PayloadAction<string>) => {
+      if (!state.user) {
+        return;
+      }
+
+      const activeMembership = state.user.memberships.find(
+        (membership) => membership.complex_id === action.payload && membership.is_active,
+      );
+
+      if (!activeMembership) {
+        state.user.grantedRoles = [];
+        state.user.permissions = [];
+        return;
+      }
+
+      state.user.role = activeMembership.role;
+      state.user.grantedRoles = activeMembership.granted_roles || [];
+      state.user.permissions = activeMembership.permissions || [];
+    },
     logout: (state) => {
       state.token = null;
       state.user = null;
@@ -60,5 +83,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setAuth, updateRole, logout, restoreSession } = authSlice.actions;
+export const { setAuth, updateRole, syncComplexAccess, logout, restoreSession } = authSlice.actions;
 export default authSlice.reducer;

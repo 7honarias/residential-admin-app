@@ -31,6 +31,13 @@ export interface BlockOccupation {
   d: number;
 }
 
+export interface DelinquencyAgingBucket {
+  range: string;
+  amount: number;
+  apartments: number;
+  fill: string;
+}
+
 export interface DashboardData {
   summary: {
     apartments: SummaryMetric;
@@ -43,6 +50,15 @@ export interface DashboardData {
     financialBalance: FinancialData[];
     paymentStatus: PaymentStatus[];
     blockOccupation: BlockOccupation[];
+    delinquencyAging: DelinquencyAgingBucket[];
+  };
+  council?: {
+    canView: boolean;
+    summary: {
+      membersCount: number;
+      ownerCount: number;
+      overdueOwners: number;
+    };
   };
   lastUpdate: string;
 }

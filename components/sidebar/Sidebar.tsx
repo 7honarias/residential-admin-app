@@ -7,12 +7,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { 
   Home, Building2, Coffee, Settings, LogOut, Car, 
   Users, MessageSquare, Bell, Package, DollarSign, Receipt,
-  ChevronDown, ChevronRight, X, UserCog, Newspaper 
+  ChevronDown, ChevronRight, X, UserCog, Newspaper, 
+  CreditCard
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
 import { setActiveComplex, clearComplex } from "@/store/slices/complexSlice";
-import { logout as logoutAction } from "@/store/slices/authSlice";
+import { logout as logoutAction, syncComplexAccess } from "@/store/slices/authSlice";
 
 const menuGroups = [
   {
@@ -53,6 +54,7 @@ const menuGroups = [
     items: [
       { name: "Usuarios", icon: UserCog, href: "/dashboard/users" },
       { name: "Configuración", icon: Settings, href: "/dashboard/settings" },
+      { name: "Suscripción", icon: CreditCard, href: "/dashboard/settings/subscription" },
     ]
   }
 ];
@@ -61,7 +63,22 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
   const router = useRouter();
   const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
   const { complexes, activeComplex } = useAppSelector((state) => state.complex);
+
+  const hasFullDashboardAccess = user ? ["ADMIN", "STAFF"].includes(user.role) : false;
+  const visibleMenuGroups = useMemo(() => {
+    if (hasFullDashboardAccess) {
+      return menuGroups;
+    }
+
+    return [
+      {
+        label: "Principal",
+        items: [{ name: "Dashboard", icon: Home, href: "/dashboard" }],
+      },
+    ];
+  }, [hasFullDashboardAccess]);
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "Principal": true,
@@ -79,6 +96,7 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
     const selected = complexes.find((c) => c.id === e.target.value);
     if (selected) {
       dispatch(setActiveComplex(selected));
+      dispatch(syncComplexAccess(selected.id));
     }
   };
 
@@ -99,7 +117,7 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
     if (!pathname) return "/dashboard";
     
     // 1. Extraemos todas las URLs del menú
-    const allLinks = menuGroups.flatMap(g => g.items.map(i => i.href));
+    const allLinks = visibleMenuGroups.flatMap(g => g.items.map(i => i.href));
     
     // 2. Filtramos las que coincidan y las ordenamos por longitud descendente
     const bestMatch = allLinks
@@ -107,7 +125,7 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
       .sort((a, b) => b.length - a.length)[0];
 
     return bestMatch || "/dashboard";
-  }, [pathname]);
+  }, [pathname, visibleMenuGroups]);
 
   return (
     <>
@@ -156,7 +174,7 @@ export default function Sidebar({ isMobileOpen, onMobileOpenChange }: { isMobile
         </div>
 
         <nav className="flex-1 px-4 overflow-y-auto custom-scrollbar">
-          {menuGroups.map((group) => (
+          {visibleMenuGroups.map((group) => (
             <div key={group.label} className="mb-2">
               
               <button

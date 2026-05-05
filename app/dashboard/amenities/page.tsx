@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAppSelector } from "@/store/hooks";
 import { 
   Plus, 
@@ -73,6 +74,18 @@ export default function AmenitiesPage() {
               key={amenity.id}
               className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow flex flex-col"
             >
+              {amenity.image_url ? (
+                <div className="h-40 w-full overflow-hidden border-b border-slate-100">
+                  <Image
+                    src={amenity.image_url}
+                    alt={`Imagen de ${amenity.name}`}
+                    width={800}
+                    height={320}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+
               <div className="p-5 flex-1">
                 <div className="flex justify-between items-start mb-3">
                   <div className="p-2 bg-blue-50 rounded-lg text-blue-600">

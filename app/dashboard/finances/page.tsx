@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import * as XLSX from 'xlsx';
 import { useAppSelector } from '@/store/hooks';
-import { fetchInvoices } from '@/services/invoices.service';
+import { fetchInvoices, fetchAllInvoicesForExport } from '@/services/invoices.service';
 import { IInvoice, InvoiceStatus } from './invoices.types';
 import InvoicesTable from '@/components/finances/InvoicesTable';
 import InvoiceFilters from '@/components/finances/InvoiceFilters';
@@ -23,29 +24,62 @@ const STATUS_OPTIONS: { label: string; value: FilterStatus }[] = [
   { label: 'Canceladas', value: 'CANCELLED' },
 ];
 
+const MONTH_NAMES_ES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+const getExportFileName = (status: FilterStatus, startDate: string, endDate: string) => {
+  const statusLabel = STATUS_OPTIONS.find((o) => o.value === status)?.label.toLowerCase() ?? 'facturas';
+  if (startDate && endDate) {
+    const sameMonth = startDate.slice(0, 7) === endDate.slice(0, 7);
+    if (sameMonth) {
+      const [year, month] = startDate.slice(0, 7).split('-').map(Number);
+      return `cartera_${statusLabel}_${MONTH_NAMES_ES[month - 1]}_${year}.xlsx`;
+    }
+    return `cartera_${statusLabel}_${startDate}_a_${endDate}.xlsx`;
+  }
+  return `cartera_${statusLabel}_todo_el_periodo.xlsx`;
+};
+
 export default function FinancesPage() {
   const activeComplex = useAppSelector((state) => state.complex.activeComplex);
   const token = useAppSelector((state) => state.auth.token);
 
   const [invoices, setInvoices] = useState<IInvoice[]>([]);
-  const [selectedStatus, setSelectedStatus] = useState<FilterStatus>('PENDING');
-  const [apartmentSearch, setApartmentSearch] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<IInvoice | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
+  // Active filters (trigger fetch)
+  const [activeStatus, setActiveStatus] = useState<FilterStatus>('PENDING');
+  const [activeBlockSearch, setActiveBlockSearch] = useState('');
+  const [activeApartmentSearch, setActiveApartmentSearch] = useState('');
+  const [activePeriodMonthNum, setActivePeriodMonthNum] = useState<number | undefined>();
+  const [activePeriodYear, setActivePeriodYear] = useState<number | undefined>();
+  const [activeStartDate, setActiveStartDate] = useState('');
+  const [activeEndDate, setActiveEndDate] = useState('');
+
+  // Temp filters (filter UI, not yet applied)
+  const [tempStatus, setTempStatus] = useState<FilterStatus>('PENDING');
+  const [tempBlockSearch, setTempBlockSearch] = useState('');
+  const [tempApartmentSearch, setTempApartmentSearch] = useState('');
+  const [tempPeriodMonth, setTempPeriodMonth] = useState('');
+  const [tempStartDate, setTempStartDate] = useState('');
+  const [tempEndDate, setTempEndDate] = useState('');
+
   const complexId = activeComplex?.id;
 
-  // Load invoices with pagination
   const loadInvoices = useCallback(
     async (cursor: string | null = null) => {
-      // ... tu código de validación ...
+      if (!complexId || !token) return;
 
       const loaderSetter = cursor ? setIsLoadingMore : setIsLoading;
       loaderSetter(true);
@@ -53,29 +87,28 @@ export default function FinancesPage() {
 
       try {
         const response = await fetchInvoices({
-          token: token ?? '',
-          complexId: complexId ?? '',
+          token,
+          complexId,
           options: {
-            status: selectedStatus === 'ALL' ? 'ALL' : selectedStatus,
-            apartmentSearch: apartmentSearch || undefined,
-            cursor: cursor || '1', // <--- CAMBIO CLAVE: Usar '1' como página inicial
+            status: activeStatus === 'ALL' ? 'ALL' : activeStatus,
+            blockSearch: activeBlockSearch || undefined,
+            apartmentSearch: activeApartmentSearch || undefined,
+            periodMonth: activePeriodMonthNum,
+            periodYear: activePeriodYear,
+            startDate: activeStartDate || undefined,
+            endDate: activeEndDate || undefined,
+            cursor: cursor || '1',
           },
         });
 
         const invoicesList = response?.invoices || [];
 
         if (cursor && cursor !== '1') {
-          // Append for "load more" CON FILTRO ANTI-DUPLICADOS
           setInvoices((prev) => {
-            // 1. Creamos un Set con los IDs que ya tenemos en pantalla
-            const existingIds = new Set(prev.map(inv => inv.id));
-            // 2. Filtramos de la nueva lista solo los que NO existan ya
-            const uniqueNewInvoices = invoicesList.filter((inv: IInvoice) => !existingIds.has(inv.id));
-            // 3. Unimos la lista vieja con la nueva limpia
-            return [...prev, ...uniqueNewInvoices];
+            const existingIds = new Set(prev.map((inv) => inv.id));
+            return [...prev, ...invoicesList.filter((inv: IInvoice) => !existingIds.has(inv.id))];
           });
         } else {
-          // Replace for new filter
           setInvoices(invoicesList);
         }
 
@@ -87,18 +120,15 @@ export default function FinancesPage() {
         loaderSetter(false);
       }
     },
-    [complexId, token, selectedStatus, apartmentSearch]
+    [complexId, token, activeStatus, activeBlockSearch, activeApartmentSearch, activePeriodMonthNum, activePeriodYear, activeStartDate, activeEndDate]
   );
 
-  // Initial load
   useEffect(() => {
-    console.log('🔄 useEffect triggered - complexId:', complexId, 'token:', !!token);
     if (complexId && token) {
-      console.log('✅ Calling loadInvoices from useEffect');
       loadInvoices();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [complexId, token, selectedStatus, apartmentSearch]);
+  }, [complexId, token, activeStatus, activeBlockSearch, activeApartmentSearch, activePeriodMonthNum, activePeriodYear, activeStartDate, activeEndDate]);
 
   const handleLoadMore = () => {
     if (nextCursor && !isLoadingMore) {
@@ -106,22 +136,107 @@ export default function FinancesPage() {
     }
   };
 
-  const handleFilterStatusChange = (status: FilterStatus) => {
-    setSelectedStatus(status);
-    setInvoices([]); // Reset list
-    setNextCursor(null);
-  };
-
-  const handleApartmentSearchChange = (search: string) => {
-    setApartmentSearch(search);
-    setInvoices([]); // Reset list
-    setNextCursor(null);
-  };
-
-  const handleClearSearch = () => {
-    setApartmentSearch('');
+  // Status tabs apply immediately
+  const handleStatusChange = (status: FilterStatus) => {
+    setTempStatus(status);
+    setActiveStatus(status);
     setInvoices([]);
     setNextCursor(null);
+  };
+
+  const handleBlockSearchChange = (value: string) => setTempBlockSearch(value);
+  const handleApartmentSearchChange = (value: string) => setTempApartmentSearch(value);
+
+  const handleClearBlockSearch = () => {
+    setTempBlockSearch('');
+    setActiveBlockSearch('');
+    setInvoices([]);
+    setNextCursor(null);
+  };
+
+  const handleClearApartmentSearch = () => {
+    setTempApartmentSearch('');
+    setActiveApartmentSearch('');
+    setInvoices([]);
+    setNextCursor(null);
+  };
+
+  // Month picker only sets period_month/year — independent from due_date range
+  const handlePeriodMonthChange = (month: string) => {
+    setTempPeriodMonth(month);
+  };
+
+  const handleDateRangeChange = (start: string, end: string) => {
+    setTempStartDate(start);
+    setTempEndDate(end);
+  };
+
+  const handleApplyFilters = () => {
+    const parsed = tempPeriodMonth ? tempPeriodMonth.split('-').map(Number) : [];
+    setActiveBlockSearch(tempBlockSearch);
+    setActiveApartmentSearch(tempApartmentSearch);
+    setActivePeriodMonthNum(parsed[1] ?? undefined);
+    setActivePeriodYear(parsed[0] ?? undefined);
+    setActiveStartDate(tempStartDate);
+    setActiveEndDate(tempEndDate);
+    setInvoices([]);
+    setNextCursor(null);
+  };
+
+  const handleClearFilters = () => {
+    setTempBlockSearch('');
+    setTempApartmentSearch('');
+    setTempPeriodMonth('');
+    setTempStartDate('');
+    setTempEndDate('');
+    setActiveBlockSearch('');
+    setActiveApartmentSearch('');
+    setActivePeriodMonthNum(undefined);
+    setActivePeriodYear(undefined);
+    setActiveStartDate('');
+    setActiveEndDate('');
+    setInvoices([]);
+    setNextCursor(null);
+  };
+
+  const handleDownloadExcel = async () => {
+    if (!complexId || !token) return;
+    setIsExporting(true);
+    try {
+      const allInvoices = await fetchAllInvoicesForExport({
+        token,
+        complexId,
+        options: {
+          status: activeStatus === 'ALL' ? 'ALL' : activeStatus,
+          blockSearch: activeBlockSearch || undefined,
+          apartmentSearch: activeApartmentSearch || undefined,
+          periodMonth: activePeriodMonthNum,
+          periodYear: activePeriodYear,
+          startDate: activeStartDate || undefined,
+          endDate: activeEndDate || undefined,
+        },
+      });
+
+      const rows = allInvoices.map((inv) => ({
+        'Apartamento': `${inv.block_number ? inv.block_number + ' - ' : ''}${inv.apartment_number}`,
+        'Tipo': inv.type,
+        'Descripción': inv.description,
+        'Monto Original': inv.amount,
+        'Saldo Pendiente': inv.balance_due,
+        'Estado': inv.status,
+        'Fecha Vencimiento': inv.due_date ? inv.due_date.slice(0, 10) : '',
+        'Creado': inv.created_at ? inv.created_at.slice(0, 10) : '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Cartera');
+      XLSX.writeFile(wb, getExportFileName(activeStatus, activeStartDate, activeEndDate));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error generando el Excel');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleInvoiceClick = (invoice: IInvoice) => {
@@ -134,16 +249,7 @@ export default function FinancesPage() {
     setSelectedInvoice(null);
   };
 
-  const handlePaymentModalOpen = () => {
-    setIsPaymentModalOpen(true);
-  };
-
-  const handlePaymentModalClose = () => {
-    setIsPaymentModalOpen(false);
-  };
-
   const handlePaymentSuccess = () => {
-    // Reload from start
     loadInvoices();
     setIsPaymentModalOpen(false);
   };
@@ -171,7 +277,7 @@ export default function FinancesPage() {
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:justify-between md:items-start">
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Finanzas</h1>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Facturación y Cartera</h1>
             <p className="text-slate-600 text-sm">Visualiza y gestiona las facturas del conjunto</p>
           </div>
           <div className="flex gap-2">
@@ -184,7 +290,7 @@ export default function FinancesPage() {
               <span className="sm:hidden">Excel</span>
             </button>
             <button
-              onClick={handlePaymentModalOpen}
+              onClick={() => setIsPaymentModalOpen(true)}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium whitespace-nowrap flex-shrink-0"
             >
               <Plus className="w-5 h-5" />
@@ -196,12 +302,24 @@ export default function FinancesPage() {
 
         {/* Filters */}
         <InvoiceFilters
-          selectedStatus={selectedStatus}
-          onStatusChange={handleFilterStatusChange}
-          apartmentSearch={apartmentSearch}
-          onSearchChange={handleApartmentSearchChange}
-          onClearSearch={handleClearSearch}
+          selectedStatus={tempStatus}
+          onStatusChange={handleStatusChange}
           statusOptions={STATUS_OPTIONS}
+          blockSearch={tempBlockSearch}
+          apartmentSearch={tempApartmentSearch}
+          onBlockSearchChange={handleBlockSearchChange}
+          onApartmentSearchChange={handleApartmentSearchChange}
+          onClearBlockSearch={handleClearBlockSearch}
+          onClearApartmentSearch={handleClearApartmentSearch}
+          periodMonth={tempPeriodMonth}
+          startDate={tempStartDate}
+          endDate={tempEndDate}
+          onPeriodMonthChange={handlePeriodMonthChange}
+          onDateRangeChange={handleDateRangeChange}
+          onApplyFilters={handleApplyFilters}
+          onClearFilters={handleClearFilters}
+          onDownloadExcel={handleDownloadExcel}
+          isExporting={isExporting}
         />
 
         {/* Error Toast */}
@@ -227,10 +345,10 @@ export default function FinancesPage() {
               No se encontraron facturas
             </h3>
             <p className="text-slate-600">
-              {apartmentSearch
-                ? 'Intenta con otro número de apartamento'
-                : selectedStatus === 'ALL'
-                  ? 'No hay facturas registradas'
+              {(activeBlockSearch || activeApartmentSearch)
+                ? 'Intenta con otra torre o número de apartamento'
+                : activeStatus === 'ALL'
+                  ? 'No hay facturas registradas para estos filtros'
                   : 'No hay facturas con este estado'}
             </p>
           </div>
@@ -270,7 +388,7 @@ export default function FinancesPage() {
 
       <ManualPaymentModal
         isOpen={isPaymentModalOpen}
-        onClose={handlePaymentModalClose}
+        onClose={() => setIsPaymentModalOpen(false)}
         onSuccess={handlePaymentSuccess}
       />
 
@@ -282,3 +400,4 @@ export default function FinancesPage() {
     </div>
   );
 }
+

@@ -1,10 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import * as XLSX from 'xlsx';
 import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/store/hooks';
-import { fetchExpenses } from '@/services/expenses.service'; // Asumiendo que crearás este servicio
-import { IExpense, ExpenseStatus } from './expenses.types'; // Asumiendo que crearás estos tipos
+import { fetchExpenses, fetchAllExpensesForExport } from '@/services/expenses.service';
+import { IExpense, ExpenseStatus } from './expenses.types';
 import ExpensesTable from '@/components/expenses/ExpensesTable';
 import ExpenseFilters from '@/components/expenses/ExpenseFilters';
 import RegisterExpensePaymentModal from '@/components/expenses/RegisterExpensePaymentModal';
@@ -15,7 +16,50 @@ import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal';
 
 type FilterStatus = ExpenseStatus | 'ALL';
 
-// Estados basados en la tabla SQL que creamos
+const MONTH_NAMES_ES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+const formatDateInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getMonthDateRange = (monthValue: string) => {
+  const [year, month] = monthValue.split('-').map(Number);
+  if (!year || !month) return { startDate: '', endDate: '' };
+  return {
+    startDate: formatDateInput(new Date(year, month - 1, 1)),
+    endDate: formatDateInput(new Date(year, month, 0)),
+  };
+};
+
+const getExportFileName = (startDate: string, endDate: string) => {
+  if (startDate && endDate) {
+    const sameMonth = startDate.slice(0, 7) === endDate.slice(0, 7);
+    if (sameMonth) {
+      const [year, month] = startDate.slice(0, 7).split('-').map(Number);
+      return `egresos_${MONTH_NAMES_ES[month - 1]}_${year}.xlsx`;
+    }
+    return `egresos_${startDate}_a_${endDate}.xlsx`;
+  }
+  return 'egresos_todo_el_periodo.xlsx';
+};
+
+const parseExportLimitInput = (input: string | null): number | undefined | null => {
+  if (input === null) return null;
+  const normalized = input.trim().toLowerCase();
+  if (!normalized || normalized === 'todo') return undefined;
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error('Ingresa un lÃ­mite vÃ¡lido mayor a 0 o escribe "todo"');
+  }
+  return parsed;
+};
+
 const STATUS_OPTIONS: { label: string; value: FilterStatus }[] = [
   { label: 'Todos', value: 'ALL' },
   { label: 'Por Pagar', value: 'PENDING' },
@@ -30,38 +74,53 @@ export default function ExpensesPage() {
   const token = useAppSelector((state) => state.auth.token);
 
   const [expenses, setExpenses] = useState<IExpense[]>([]);
-  const [selectedStatus, setSelectedStatus] = useState<FilterStatus>('PENDING');
-  const [supplierSearch, setSupplierSearch] = useState('');
   const [selectedExpense, setSelectedExpense] = useState<IExpense | null>(null);
-  
-  // Control de Modales
+
+  // Active filters (used for fetching)
+  const [activeStatus, setActiveStatus] = useState<FilterStatus>('PENDING');
+  const [activeSupplierSearch, setActiveSupplierSearch] = useState('');
+  const [activePeriodMonth, setActivePeriodMonth] = useState('');
+  const [activeStartDate, setActiveStartDate] = useState('');
+  const [activeEndDate, setActiveEndDate] = useState('');
+
+  // Temporary filters (controlled by filter UI before applying)
+  const [tempStatus, setTempStatus] = useState<FilterStatus>('PENDING');
+  const [tempSupplierSearch, setTempSupplierSearch] = useState('');
+  const [tempPeriodMonth, setTempPeriodMonth] = useState('');
+  const [tempStartDate, setTempStartDate] = useState('');
+  const [tempEndDate, setTempEndDate] = useState('');
+
+  // Modal state
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  
-  // Control de Carga y Paginación
+
+  // Loading & pagination
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
   const complexId = activeComplex?.id;
 
-  // Cargar egresos con paginación
   const loadExpenses = useCallback(
     async (cursor: string | null = null) => {
+      if (!complexId || !token) return;
       const loaderSetter = cursor ? setIsLoadingMore : setIsLoading;
       loaderSetter(true);
       setError(null);
 
       try {
         const response = await fetchExpenses({
-          token: token ?? '',
-          complexId: complexId ?? '',
+          token,
+          complexId,
           options: {
-            status: selectedStatus === 'ALL' ? 'ALL' : selectedStatus,
-            search: supplierSearch || undefined, // Búsqueda por nombre de proveedor o # de factura
+            status: activeStatus === 'ALL' ? 'ALL' : activeStatus,
+            search: activeSupplierSearch || undefined,
+            startDate: activeStartDate || undefined,
+            endDate: activeEndDate || undefined,
             cursor: cursor || '1',
           },
         });
@@ -69,11 +128,9 @@ export default function ExpensesPage() {
         const expensesList = response?.expenses || [];
 
         if (cursor && cursor !== '1') {
-          // Filtro anti-duplicados para el "Load More"
           setExpenses((prev) => {
-            const existingIds = new Set(prev.map(exp => exp.id));
-            const uniqueNewExpenses = expensesList.filter((exp: IExpense) => !existingIds.has(exp.id));
-            return [...prev, ...uniqueNewExpenses];
+            const existingIds = new Set(prev.map((e) => e.id));
+            return [...prev, ...expensesList.filter((e: IExpense) => !existingIds.has(e.id))];
           });
         } else {
           setExpenses(expensesList);
@@ -87,49 +144,185 @@ export default function ExpensesPage() {
         loaderSetter(false);
       }
     },
-    [complexId, token, selectedStatus, supplierSearch]
+    [complexId, token, activeStatus, activeSupplierSearch, activeStartDate, activeEndDate]
   );
 
-  // Carga inicial
   useEffect(() => {
     if (complexId && token) {
       loadExpenses();
     }
-  }, [complexId, token, selectedStatus, supplierSearch, loadExpenses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complexId, token, activeStatus, activeSupplierSearch, activeStartDate, activeEndDate]);
 
   const handleLoadMore = () => {
-    if (nextCursor && !isLoadingMore) {
-      loadExpenses(nextCursor);
-    }
+    if (nextCursor && !isLoadingMore) loadExpenses(nextCursor);
   };
 
-  const handleFilterStatusChange = (status: FilterStatus) => {
-    setSelectedStatus(status);
+  // Status tabs apply immediately
+  const handleStatusChange = (status: FilterStatus) => {
+    setTempStatus(status);
+    setActiveStatus(status);
     setExpenses([]);
     setNextCursor(null);
   };
 
   const handleSupplierSearchChange = (search: string) => {
-    setSupplierSearch(search);
-    setExpenses([]);
-    setNextCursor(null);
+    setTempSupplierSearch(search);
   };
 
   const handleClearSearch = () => {
-    setSupplierSearch('');
+    setTempSupplierSearch('');
+    setActiveSupplierSearch('');
     setExpenses([]);
     setNextCursor(null);
   };
 
-  // Acciones de fila
+  const handlePeriodMonthChange = (month: string) => {
+    setTempPeriodMonth(month);
+    if (!month) return;
+    const { startDate, endDate } = getMonthDateRange(month);
+    setTempStartDate(startDate);
+    setTempEndDate(endDate);
+  };
+
+  const handleDateRangeChange = (start: string, end: string) => {
+    if (tempPeriodMonth) setTempPeriodMonth('');
+    setTempStartDate(start);
+    setTempEndDate(end);
+  };
+
+  const handleApplyFilters = () => {
+    setActiveSupplierSearch(tempSupplierSearch);
+    setActivePeriodMonth(tempPeriodMonth);
+    setActiveStartDate(tempStartDate);
+    setActiveEndDate(tempEndDate);
+    setExpenses([]);
+    setNextCursor(null);
+  };
+
+  const handleClearFilters = () => {
+    setTempStatus('PENDING');
+    setTempSupplierSearch('');
+    setTempPeriodMonth('');
+    setTempStartDate('');
+    setTempEndDate('');
+    setActiveStatus('PENDING');
+    setActiveSupplierSearch('');
+    setActivePeriodMonth('');
+    setActiveStartDate('');
+    setActiveEndDate('');
+    setExpenses([]);
+    setNextCursor(null);
+  };
+
+  const handleDownloadExcel = async () => {
+    if (!complexId || !token) {
+      setError('No hay complejo activo o token de autenticaciÃ³n');
+      return;
+    }
+
+    setIsExporting(true);
+    setError(null);
+
+    try {
+      const selectedMonth = tempPeriodMonth || activePeriodMonth;
+      const selectedStartDate = tempStartDate || activeStartDate;
+      const selectedEndDate = tempEndDate || activeEndDate;
+
+      const normalizedRange = selectedMonth
+        ? getMonthDateRange(selectedMonth)
+        : { startDate: selectedStartDate, endDate: selectedEndDate };
+
+      const baseFilters = {
+        status: (tempStatus || activeStatus) === 'ALL' ? undefined : (tempStatus || activeStatus),
+        search: tempSupplierSearch || activeSupplierSearch || undefined,
+        startDate: normalizedRange.startDate || undefined,
+        endDate: normalizedRange.endDate || undefined,
+      };
+
+      // Preview count
+      const preview = await fetchExpenses({
+        token,
+        complexId,
+        options: { ...baseFilters, limit: 1, cursor: '1' },
+      });
+
+      const total = preview.total ?? 0;
+
+      if (total === 0) {
+        setError('No hay egresos para exportar con los filtros actuales');
+        return;
+      }
+
+      const periodLabel =
+        normalizedRange.startDate && normalizedRange.endDate
+          ? `${normalizedRange.startDate} a ${normalizedRange.endDate}`
+          : 'todo el periodo disponible';
+
+      const shouldContinue = window.confirm(
+        `Se encontraron ${total} egresos con los filtros actuales.\n\n` +
+        `Periodo: ${periodLabel}\n` +
+        `Estado: ${baseFilters.status || 'Todos'}\n` +
+        `BÃºsqueda: ${baseFilters.search || 'Ninguna'}\n\n` +
+        'Â¿Deseas continuar con la descarga del Excel?'
+      );
+      if (!shouldContinue) return;
+
+      const limitInput = window.prompt(
+        `Â¿CuÃ¡ntos registros deseas exportar?\n` +
+        `- Escribe un nÃºmero (ejemplo: 500)\n` +
+        `- Escribe "todo" para exportar todos\n` +
+        `Total encontrado: ${total}`,
+        total > 1000 ? '1000' : String(total)
+      );
+
+      const requestedLimit = parseExportLimitInput(limitInput);
+      if (requestedLimit === null) return;
+
+      const safeLimit = requestedLimit ? Math.min(requestedLimit, total) : undefined;
+
+      const allExpenses = await fetchAllExpensesForExport({
+        token,
+        complexId,
+        options: { ...baseFilters, maxRecords: safeLimit },
+      });
+
+      if (allExpenses.length === 0) {
+        setError('No hay egresos para exportar en el periodo seleccionado');
+        return;
+      }
+
+      const rows = allExpenses.map((expense: IExpense) => ({
+        Proveedor: expense.supplierName,
+        'Categoria': expense.categoryName,
+        '# Factura': expense.invoiceNumber || '-',
+        'Fecha emision': expense.issueDate ? new Date(expense.issueDate).toLocaleDateString('es-CO') : '-',
+        'Fecha vencimiento': expense.dueDate ? new Date(expense.dueDate).toLocaleDateString('es-CO') : '-',
+        'Descripcion': expense.description,
+        'Monto total (COP)': expense.totalAmount,
+        'Monto pagado (COP)': expense.paidAmount,
+        'Saldo pendiente (COP)': expense.totalAmount - expense.paidAmount,
+        Estado: expense.status,
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Egresos');
+      XLSX.writeFile(workbook, getExportFileName(normalizedRange.startDate, normalizedRange.endDate));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error generando archivo Excel');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleExpenseClick = (expense: IExpense) => {
     setSelectedExpense(expense);
     setIsDetailModalOpen(true);
   };
 
-  // Acciones de éxito tras crear/pagar
   const handleSuccessAction = () => {
-    loadExpenses(); // Recargar la lista desde cero
+    loadExpenses();
     setIsCreateModalOpen(false);
     setIsPaymentModalOpen(false);
   };
@@ -139,9 +332,7 @@ export default function ExpensesPage() {
       <div className="flex items-center justify-center h-screen">
         <div className="flex items-center gap-3">
           <AlertCircle className="w-8 h-8 text-red-500" />
-          <p className="text-lg font-semibold text-slate-700">
-            No active complex selected
-          </p>
+          <p className="text-lg font-semibold text-slate-700">No active complex selected</p>
         </div>
       </div>
     );
@@ -150,7 +341,7 @@ export default function ExpensesPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
-        
+
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:justify-between md:items-start">
           <div className="flex-1">
@@ -158,7 +349,6 @@ export default function ExpensesPage() {
             <p className="text-slate-600 text-sm">Gestiona las cuentas por pagar y los gastos del conjunto</p>
           </div>
           <div className="flex gap-3">
-            {/* Botón secundario para ir al directorio de proveedores (Opcional) */}
             <button
               onClick={() => router.push('/dashboard/finances/suppliers')}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors font-medium whitespace-nowrap flex-shrink-0 shadow-sm"
@@ -166,8 +356,6 @@ export default function ExpensesPage() {
               <Users className="w-5 h-5 text-slate-500" />
               <span className="hidden sm:inline">Proveedores</span>
             </button>
-            
-            {/* Botón principal de acción */}
             <button
               onClick={() => setIsCreateModalOpen(true)}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium whitespace-nowrap flex-shrink-0 shadow-sm"
@@ -179,30 +367,37 @@ export default function ExpensesPage() {
           </div>
         </div>
 
-        {/* Filters (Reutilizamos la lógica visual, pero buscamos por proveedor/factura) */}
+        {/* Filters */}
         <ExpenseFilters
-          selectedStatus={selectedStatus}
-          onStatusChange={handleFilterStatusChange}
-          searchQuery={supplierSearch}
+          selectedStatus={tempStatus}
+          onStatusChange={handleStatusChange}
+          searchQuery={tempSupplierSearch}
           onSearchChange={handleSupplierSearchChange}
           onClearSearch={handleClearSearch}
           statusOptions={STATUS_OPTIONS}
           searchPlaceholder="Buscar proveedor o # factura..."
+          periodMonth={tempPeriodMonth}
+          startDate={tempStartDate}
+          endDate={tempEndDate}
+          onPeriodMonthChange={handlePeriodMonthChange}
+          onDateRangeChange={handleDateRangeChange}
+          onApplyFilters={handleApplyFilters}
+          onClearFilters={handleClearFilters}
+          onDownloadExcel={handleDownloadExcel}
+          isExporting={isExporting}
         />
 
-        {/* Error Toast */}
+        {/* Error */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
             <p className="text-red-800 font-medium flex items-center gap-2">
               <AlertCircle className="w-5 h-5" /> {error}
             </p>
-            <button onClick={() => setError(null)} className="text-red-600 hover:text-red-900 font-semibold">
-              ✕
-            </button>
+            <button onClick={() => setError(null)} className="text-red-600 hover:text-red-900 font-semibold">âœ•</button>
           </div>
         )}
 
-        {/* Listado / Estados de Carga / Vacío */}
+        {/* List */}
         {isLoading && <ExpensesTableSkeleton rows={5} />}
 
         {!isLoading && expenses.length === 0 && !error && (
@@ -212,14 +407,12 @@ export default function ExpensesPage() {
                 <Receipt className="w-8 h-8" />
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">
-              No hay egresos para mostrar
-            </h3>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">No hay egresos para mostrar</h3>
             <p className="text-slate-500 max-w-sm mx-auto">
-              {supplierSearch
-                ? 'No encontramos ningún proveedor o factura con ese término.'
-                : selectedStatus === 'ALL'
-                  ? 'Aquí aparecerán los gastos operativos, servicios y pagos a contratistas.'
+              {tempSupplierSearch
+                ? 'No encontramos ningÃºn proveedor o factura con ese tÃ©rmino.'
+                : activeStatus === 'ALL'
+                  ? 'AquÃ­ aparecerÃ¡n los gastos operativos, servicios y pagos a contratistas.'
                   : 'No hay gastos registrados bajo este estado.'}
             </p>
           </div>
@@ -235,8 +428,6 @@ export default function ExpensesPage() {
                 setIsPaymentModalOpen(true);
               }}
             />
-
-            {/* Load More Button */}
             {hasMore && (
               <div className="p-6 border-t border-slate-100 text-center bg-slate-50">
                 <button
@@ -244,7 +435,7 @@ export default function ExpensesPage() {
                   disabled={isLoadingMore}
                   className="px-6 py-2.5 bg-white border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                 >
-                  {isLoadingMore ? 'Cargando más...' : 'Ver más egresos'}
+                  {isLoadingMore ? 'Cargando mÃ¡s...' : 'Ver mÃ¡s egresos'}
                 </button>
               </div>
             )}
@@ -257,10 +448,7 @@ export default function ExpensesPage() {
         <ExpenseDetailModal
           expense={selectedExpense}
           isOpen={isDetailModalOpen}
-          onClose={() => {
-            setIsDetailModalOpen(false);
-            setSelectedExpense(null);
-          }}
+          onClose={() => { setIsDetailModalOpen(false); setSelectedExpense(null); }}
         />
       )}
 
@@ -274,10 +462,7 @@ export default function ExpensesPage() {
         <RegisterExpensePaymentModal
           expense={selectedExpense}
           isOpen={isPaymentModalOpen}
-          onClose={() => {
-            setIsPaymentModalOpen(false);
-            setSelectedExpense(null);
-          }}
+          onClose={() => { setIsPaymentModalOpen(false); setSelectedExpense(null); }}
           onSuccess={handleSuccessAction}
         />
       )}

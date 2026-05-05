@@ -16,8 +16,15 @@ import {
   CheckCircle2,
   Calendar,
   ChevronRight,
+  UploadCloud,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
-import { upsertAmenity } from "@/services/amenities.service";
+import {
+  upsertAmenity,
+  uploadAmenityImage,
+  deleteAmenityImageByUrl,
+} from "@/services/amenities.service";
 import {
   AmenityFormData,
   AmenityFormProps,
@@ -84,6 +91,10 @@ export default function AmenityForm({
   const [schedules, setSchedules] = useState<Schedule[]>(defaultValues?.schedules || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(
+    defaultValues?.image_url || null,
+  );
 
   const pricingType = watch("pricing_type");
   const bookingMode = watch("booking_mode");
@@ -156,12 +167,30 @@ export default function AmenityForm({
       return;
     }
 
+    let uploadedNewImageUrl: string | null = null;
+
     try {
       setLoading(true);
+      let uploadedImageUrl: string | null = defaultValues?.image_url || null;
+
+      if (imageFile) {
+        const uploaded = await uploadAmenityImage({
+          file: imageFile,
+          complexId,
+          amenityId,
+        });
+        uploadedImageUrl = uploaded.imageUrl;
+        uploadedNewImageUrl = uploaded.imageUrl;
+
+        if (defaultValues?.image_url) {
+          await deleteAmenityImageByUrl(defaultValues.image_url);
+        }
+      }
       
       // Asegurar que los valores numéricos se envíen correctamente
       const payload = {
         ...data,
+        image_url: uploadedImageUrl,
         capacity: parseInt(String(data.capacity), 10),
         price: parseFloat(String(data.price)) || 0,
         slot_duration: parseInt(String(data.slot_duration), 10),
@@ -173,10 +202,34 @@ export default function AmenityForm({
       if (onSuccess) onSuccess();
       if (onFinished) onFinished();
     } catch (err: any) {
+      if (uploadedNewImageUrl) {
+        try {
+          await deleteAmenityImageByUrl(uploadedNewImageUrl);
+        } catch {
+          // Ignore cleanup errors to preserve primary failure message.
+        }
+      }
       setError(err.message || "Error al guardar la amenity");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0];
+    if (!selected) return;
+
+    const objectUrl = URL.createObjectURL(selected);
+    setImageFile(selected);
+    setImagePreviewUrl(objectUrl);
+  };
+
+  const clearSelectedImage = () => {
+    if (imagePreviewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setImageFile(null);
+    setImagePreviewUrl(null);
   };
 
   return (
@@ -214,6 +267,57 @@ export default function AmenityForm({
               className="w-full px-4 py-3 bg-slate-50 border-transparent border focus:border-blue-500 focus:bg-white rounded-2xl outline-none transition-all min-h-[100px] text-slate-600 text-sm"
               placeholder="Describe las reglas de uso..."
             />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
+              Imagen (Opcional)
+            </label>
+
+            <div className="border border-dashed border-slate-300 rounded-2xl p-4 bg-slate-50/40">
+              {imagePreviewUrl ? (
+                <div className="space-y-3">
+                  <div className="relative h-44 w-full overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <img
+                      src={imagePreviewUrl}
+                      alt="Vista previa de la imagen del amenity"
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearSelectedImage}
+                      className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/70 text-white text-xs font-bold px-2 py-1"
+                    >
+                      <X className="w-3 h-3" />
+                      Quitar
+                    </button>
+                  </div>
+
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold cursor-pointer hover:bg-slate-100 transition-colors">
+                    <UploadCloud className="w-4 h-4" />
+                    Reemplazar imagen
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer text-slate-500 hover:text-slate-700 transition-colors">
+                  <ImageIcon className="w-6 h-6" />
+                  <span className="text-xs font-bold">Subir imagen del amenity</span>
+                  <span className="text-[11px]">JPG, PNG o WebP. Máximo 5 MB.</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
           </div>
 
           <div>

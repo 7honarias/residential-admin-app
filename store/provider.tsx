@@ -3,7 +3,7 @@
 import { Provider } from "react-redux";
 import { store } from "./index";
 import { useEffect } from "react";
-import { setAuth, updateRole, logout } from "./slices/authSlice";
+import { setAuth, syncComplexAccess, logout } from "./slices/authSlice";
 import { supabase } from "@/lib/supabaseClient";
 import {
   setComplexes,
@@ -31,6 +31,8 @@ function extractMemberships(accessToken: string) {
     apartment_id: (m.apartment_id as string) || null,
     role: (m.role as string) || "USER",
     is_active: !!m.is_active,
+    granted_roles: Array.isArray(m.granted_roles) ? m.granted_roles : [],
+    permissions: Array.isArray(m.permissions) ? m.permissions : [],
   }));
 }
 
@@ -55,6 +57,8 @@ function SessionSync({ children }: { children: React.ReactNode }) {
               email: user.email || "",
               role: firstActive?.role || "USER",
               memberships,
+              grantedRoles: firstActive?.granted_roles || [],
+              permissions: firstActive?.permissions || [],
             },
           }),
         );
@@ -80,6 +84,8 @@ function SessionSync({ children }: { children: React.ReactNode }) {
               email: session.user.email || "",
               role: firstActive?.role || "USER",
               memberships,
+              grantedRoles: firstActive?.granted_roles || [],
+              permissions: firstActive?.permissions || [],
             },
           }),
         );
@@ -134,8 +140,8 @@ function SessionSync({ children }: { children: React.ReactNode }) {
 
         if (selectedComplex) {
           store.dispatch(setActiveComplex(selectedComplex));
-          if (matchedRole) {
-            store.dispatch(updateRole(matchedRole));
+          if (matchedRole || selectedComplex.id) {
+            store.dispatch(syncComplexAccess(selectedComplex.id));
           }
         }
       } else {
