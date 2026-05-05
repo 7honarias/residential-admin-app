@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, XCircle, Star, Loader2, ChevronRight, Building2, Layers } from "lucide-react";
+import { CheckCircle, XCircle, Star, Building2, Layers } from "lucide-react";
 import { VestapPlan } from "@/services/vestapBilling.service";
 
 // ==================== HELPERS ====================
@@ -26,8 +26,6 @@ export interface VestapPlanCardProps {
 export default function VestapPlanCard({
   plan,
   isCurrent,
-  isProcessing,
-  onSelect,
 }: VestapPlanCardProps) {
   const cycleLabel = plan.billing_cycle === "MONTHLY" ? "mes" : "año";
   const cycleTag = plan.billing_cycle === "MONTHLY" ? "Mensual" : "Anual";

@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import CreatePollModal from "@/components/assemblies/CreatePollModal";
+import FinalizeAssemblyModal from "@/components/assemblies/FinalizeAssemblyModal";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppSelector } from "@/store/hooks";
 import {
@@ -81,6 +82,9 @@ export default function AssemblyRoomPage() {
   const [proxyName, setProxyName] = useState("");
   const [proxyId, setProxyId] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+
+  // --- ESTADO DEL MODAL DE FINALIZACIÓN ---
+  const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
 
   // --- ESTADOS DE GRABACIÓN ---
   type RecordingPhase = "IDLE" | "SOUND_TEST" | "READY" | "RECORDING" | "DONE";
@@ -309,21 +313,54 @@ export default function AssemblyRoomPage() {
   // ==========================================
   // FUNCIONES DEL EVENTO GENERAL
   // ==========================================
-  const advanceAssemblyState = async () => {
-    let newStatus: "REGISTRATION_OPEN" | "IN_PROGRESS" | "FINISHED" | null =
-      null;
+  // Descarga el acta PDF desde Supabase para asambleas ya finalizadas
+  const handleDownloadActa = async () => {
+    try {
+      setIsProcessing(true);
+      const { data, error } = await supabase
+        .from("assembly_acts")
+        .select("file_url, file_path, acta_number")
+        .eq("assembly_id", assembly.id)
+        .single();
 
+      if (error || !data) {
+        alert("No se encontró el acta para esta asamblea. Es posible que aún no se haya generado.");
+        return;
+      }
+
+      if (data.file_url) {
+        const link = document.createElement("a");
+        link.href = data.file_url;
+        link.target = "_blank";
+        link.download = `Acta_${data.acta_number ?? assembly.id}.pdf`;
+        link.click();
+      } else {
+        alert("La URL del acta no está disponible.");
+      }
+    } catch (err: any) {
+      alert(`Error al descargar el acta: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // ==========================================
+  const advanceAssemblyState = async () => {
+    // Si la asamblea ya está FINALIZADA, descargamos el acta directamente.
+    if (assembly.status === "FINISHED") {
+      await handleDownloadActa();
+      return;
+    }
+
+    // Si está EN PROGRESO, abrimos el flujo de generación de acta.
+    if (assembly.status === "IN_PROGRESS") {
+      setIsFinalizeModalOpen(true);
+      return;
+    }
+
+    let newStatus: "REGISTRATION_OPEN" | "IN_PROGRESS" | "FINISHED" | null = null;
     if (assembly.status === "SCHEDULED") newStatus = "REGISTRATION_OPEN";
     else if (assembly.status === "REGISTRATION_OPEN") newStatus = "IN_PROGRESS";
-    else if (assembly.status === "IN_PROGRESS") {
-      if (
-        !window.confirm(
-          "¿Estás seguro de finalizar la asamblea? Ya no se podrán hacer más votaciones ni alterar el orden del día.",
-        )
-      )
-        return;
-      newStatus = "FINISHED";
-    }
 
     if (!newStatus) return;
 
@@ -340,6 +377,18 @@ export default function AssemblyRoomPage() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Llamado por FinalizeAssemblyModal tras generar el PDF y recoger las firmas
+  const handleFinalizeConfirmed = async () => {
+    // Si ya está finalizada (re-descarga), no cambiar estado
+    if (assembly.status === "FINISHED") return;
+    await changeAssemblyStatus({
+      token: token!,
+      complexId: activeComplex!.id,
+      payload: { assembly_id: assembly.id, status: "FINISHED" },
+    });
+    await loadData();
   };
 
   // ==========================================
@@ -607,7 +656,7 @@ export default function AssemblyRoomPage() {
     FINISHED: {
       label: "Finalizada",
       color: "bg-purple-100 text-purple-700",
-      action: "Generar Acta PDF",
+      action: "Descargar Acta",
     },
   };
 
@@ -669,16 +718,18 @@ export default function AssemblyRoomPage() {
             >
               <Users className="w-4 h-4" /> Asistencia
             </button>
-            <button
-              onClick={() => setActiveTab("RECORDING")}
-              className={`pb-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === "RECORDING" ? "border-rose-600 text-rose-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-            >
-              <Mic className="w-4 h-4" />
-              Grabación
-              {recordingPhase === "RECORDING" && (
-                <span className="w-2 h-2 bg-rose-600 rounded-full animate-pulse" />
-              )}
-            </button>
+            {assembly.status !== "FINISHED" && (
+              <button
+                onClick={() => setActiveTab("RECORDING")}
+                className={`pb-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === "RECORDING" ? "border-rose-600 text-rose-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+              >
+                <Mic className="w-4 h-4" />
+                Grabación
+                {recordingPhase === "RECORDING" && (
+                  <span className="w-2 h-2 bg-rose-600 rounded-full animate-pulse" />
+                )}
+              </button>
+            )}
           </div>
 
           {/* --- CONTENIDO DE LAS PESTAÑAS --- */}
@@ -1313,7 +1364,7 @@ export default function AssemblyRoomPage() {
             </p>
             <button
               onClick={advanceAssemblyState}
-              disabled={assembly.status === "FINISHED" || isProcessing}
+              disabled={isProcessing}
               className="w-full py-3.5 bg-white text-slate-900 font-black text-sm rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
             >
               {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -1330,6 +1381,21 @@ export default function AssemblyRoomPage() {
           onClose={() => setIsCreatePollOpen(false)}
           onSubmit={handleCreatePoll}
           isProcessing={isProcessing}
+        />
+      )}
+
+      {isFinalizeModalOpen && (
+        <FinalizeAssemblyModal
+          isOpen={true}
+          onClose={() => setIsFinalizeModalOpen(false)}
+          onFinalize={handleFinalizeConfirmed}
+          assembly={assembly}
+          agenda={agenda}
+          polls={polls}
+          logs={logs}
+          attendanceList={attendanceList}
+          complexName={activeComplex?.name ?? "Conjunto Residencial"}
+          complexId={activeComplex?.id ?? ""}
         />
       )}
 

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { X, Calendar, Clock, Type, Loader2 } from "lucide-react";
+import { X, Calendar, Clock, Type, MapPin, Loader2 } from "lucide-react";
 
 interface CreateAssemblyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { title: string; scheduled_for: string }) => void;
+  onSubmit: (data: { title: string; scheduled_for: string; address?: string }) => void;
   isProcessing: boolean;
 }
 
@@ -14,6 +14,7 @@ export default function CreateAssemblyModal({ isOpen, onClose, onSubmit, isProce
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [address, setAddress] = useState("");
 
   if (!isOpen) return null;
 
@@ -25,7 +26,7 @@ export default function CreateAssemblyModal({ isOpen, onClose, onSubmit, isProce
     const dateTimeString = `${date}T${time}:00`;
     const scheduled_for = new Date(dateTimeString).toISOString();
 
-    onSubmit({ title, scheduled_for });
+    onSubmit({ title, scheduled_for, address: address.trim() || undefined });
   };
 
   return (
@@ -88,6 +89,20 @@ export default function CreateAssemblyModal({ isOpen, onClose, onSubmit, isProce
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all disabled:opacity-60"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" /> Lugar / Dirección <span className="normal-case font-normal">(opcional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: Salón Comunal, Calle 123"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={isProcessing}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all disabled:opacity-60"
+            />
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-50">

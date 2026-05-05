@@ -99,6 +99,7 @@ export default function AssembliesPage() {
   const handleCreateAssembly = async (data: {
     title: string;
     scheduled_for: string;
+    address?: string;
   }) => {
     try {
       setIsProcessing(true);

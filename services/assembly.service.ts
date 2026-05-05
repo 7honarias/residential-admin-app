@@ -34,6 +34,9 @@ export interface AssemblyDetailResponse {
     scheduled_for: string;
     quorum_percentage: number;
     attendees_count: number;
+    address?: string;
+    start_date?: string;
+    end_date?: string;
   };
   agenda: any[];
   polls: any[];
@@ -161,7 +164,7 @@ const executeAssemblyAction = async (
 };
 
 export const createAssembly = async (
-  data: { title: string; scheduled_for: string },
+  data: { title: string; scheduled_for: string; address?: string },
   token: string,
   complexId: string,
 ) => {
