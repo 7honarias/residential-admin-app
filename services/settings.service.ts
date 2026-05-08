@@ -623,7 +623,7 @@ export const updateFinancialSettings = async (
 
 export type InvoiceGenerationMode = "AUTOMATIC" | "EXCEL_UPLOAD";
 export type PaymentMode = "PAYMENT_GATEWAY" | "REDIRECT_LINK";
-export type GatewayProvider = "PLACETOPAY" | "BOLD";
+export type GatewayProvider = "PLACETOPAY" | "BOLD" | "EPAYCO";
 
 export interface BillingConfig {
   invoiceGenerationMode: InvoiceGenerationMode;
@@ -640,6 +640,10 @@ export interface BillingConfig {
   // BOLD credentials
   boldIdentityKey?: string;
   boldSecretKey?: string;
+  // ePayco credentials
+  epaycoPublicKey?: string;   // merchant_id / public key
+  epaycoPrivateKey?: string;  // p_key (encrypted at rest)
+  epaycoServiceCode?: string; // PSE Multicrédito service code (public)
   redirectPaymentUrl?: string;
   /** True when the backend has stored secret credentials (they are never returned) */
   hasConfiguredSecrets?: boolean;
@@ -697,6 +701,9 @@ export const fetchBillingConfig = async (
       privateKey: undefined,
       boldIdentityKey: creds.bold_identity_key ?? undefined,
       boldSecretKey: undefined,
+      epaycoPublicKey: creds.merchant_id && (data.config.gateway_provider === 'EPAYCO') ? creds.merchant_id : undefined,
+      epaycoPrivateKey: undefined,
+      epaycoServiceCode: creds.epayco_service_code ?? undefined,
       redirectPaymentUrl: data.config.redirect_payment_url,
       hasConfiguredSecrets: creds.is_configured === true,
     };
@@ -727,10 +734,14 @@ export const updateBillingConfig = async (
           gateway_provider: params.config.gatewayProvider,
           invoice_generation_day: params.config.invoiceGenerationDay,
           payment_due_days: params.config.paymentDueDays,
-          merchant_id: params.config.merchantId,
+          merchant_id: params.config.gatewayProvider === 'EPAYCO'
+            ? params.config.epaycoPublicKey
+            : params.config.merchantId,
           private_key: params.config.privateKey,
           bold_identity_key: params.config.boldIdentityKey,
           bold_secret_key: params.config.boldSecretKey,
+          p_key: params.config.epaycoPrivateKey,
+          epayco_service_code: params.config.epaycoServiceCode,
           redirect_payment_url: params.config.redirectPaymentUrl,
         }),
       }
@@ -760,6 +771,9 @@ export const updateBillingConfig = async (
       privateKey: undefined,
       boldIdentityKey: creds.bold_identity_key ?? undefined,
       boldSecretKey: undefined,
+      epaycoPublicKey: data.config.gateway_provider === 'EPAYCO' ? (creds.merchant_id ?? undefined) : undefined,
+      epaycoPrivateKey: undefined,
+      epaycoServiceCode: creds.epayco_service_code ?? undefined,
       redirectPaymentUrl: data.config.redirect_payment_url,
       hasConfiguredSecrets: creds.is_configured === true,
     };

@@ -215,8 +215,6 @@ export const registerManualPayment = async ({
       idempotency_key: payload.idempotency_key || generateIdempotencyKey(),
     };
 
-    console.log('💳 Registering manual payment with idempotency_key:', enrichedPayload.idempotency_key);
-
     const response = await fetch(
       `${API_URL}/managePayment?${params.toString()}`,
       {

@@ -74,7 +74,6 @@ export default function ApartmentDetailPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleUpdateOwner = async (ownerForm: any) => {
-    console.log("[handleUpdateOwner] called, ownerForm:", ownerForm, "activeComplex:", activeComplex?.id, "apartmentId:", apartmentId);
     if (!activeComplex?.id || !apartmentId) return;
 
     try {

@@ -7,7 +7,6 @@ import { useAppSelector } from "@/store/hooks";
 
 export default function LandingPage() {
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
-  console.log("Estado de autenticación:", isAuthenticated, "Usuario:", user);
   const isAdmin = isAuthenticated && user?.role === "ADMIN";
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-200">

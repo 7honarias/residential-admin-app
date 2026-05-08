@@ -193,7 +193,6 @@ export default function AmenityDetailsPage() {
 
       await upsertAmenity(token!, activeComplex!.id, amenityData, amenityId as string);
       setAmenity(updatedAmenity);
-      console.log("Amenity updated successfully");
     } catch (err: any) {
       throw new Error(err.message || "Error al guardar la configuración");
     } finally {

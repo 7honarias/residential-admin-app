@@ -20,7 +20,7 @@ import {
 // ─────────────────────────────────────────────
 export type InvoiceGenerationMode = "AUTOMATIC" | "EXCEL_UPLOAD";
 export type PaymentMode = "PAYMENT_GATEWAY" | "REDIRECT_LINK";
-export type GatewayProvider = "PLACETOPAY" | "BOLD";
+export type GatewayProvider = "PLACETOPAY" | "BOLD" | "EPAYCO";
 
 export interface BillingConfig {
   invoiceGenerationMode: InvoiceGenerationMode;
@@ -34,6 +34,10 @@ export interface BillingConfig {
   privateKey?: string;
   boldIdentityKey?: string;
   boldSecretKey?: string;
+  // ePayco
+  epaycoPublicKey?: string;
+  epaycoPrivateKey?: string;
+  epaycoServiceCode?: string;
   redirectPaymentUrl?: string;
   /** True when the backend has stored secret credentials */
   hasConfiguredSecrets?: boolean;
@@ -192,6 +196,9 @@ type FormState = {
   privateKey: string;
   boldIdentityKey: string;
   boldSecretKey: string;
+  epaycoPublicKey: string;
+  epaycoPrivateKey: string;
+  epaycoServiceCode: string;
   redirectUrl: string;
 };
 
@@ -205,6 +212,9 @@ const buildFormState = (c?: BillingConfig | null): FormState => ({
   privateKey: c?.privateKey ?? "",
   boldIdentityKey: c?.boldIdentityKey ?? "",
   boldSecretKey: c?.boldSecretKey ?? "",
+  epaycoPublicKey: c?.epaycoPublicKey ?? "",
+  epaycoPrivateKey: c?.epaycoPrivateKey ?? "",
+  epaycoServiceCode: c?.epaycoServiceCode ?? "",
   redirectUrl: c?.redirectPaymentUrl ?? "",
 });
 
@@ -231,9 +241,12 @@ export default function BillingConfigForm({
   const setPrivateKey = (v: string) => setForm((f) => ({ ...f, privateKey: v }));
   const setBoldIdentityKey = (v: string) => setForm((f) => ({ ...f, boldIdentityKey: v }));
   const setBoldSecretKey = (v: string) => setForm((f) => ({ ...f, boldSecretKey: v }));
+  const setEpaycoPublicKey = (v: string) => setForm((f) => ({ ...f, epaycoPublicKey: v }));
+  const setEpaycoPrivateKey = (v: string) => setForm((f) => ({ ...f, epaycoPrivateKey: v }));
+  const setEpaycoServiceCode = (v: string) => setForm((f) => ({ ...f, epaycoServiceCode: v }));
   const setRedirectUrl = (v: string) => setForm((f) => ({ ...f, redirectUrl: v }));
 
-  const { invoiceMode, paymentMode, gatewayProvider, invoiceGenerationDay, paymentDueDays, merchantId, privateKey, boldIdentityKey, boldSecretKey, redirectUrl } = form;
+  const { invoiceMode, paymentMode, gatewayProvider, invoiceGenerationDay, paymentDueDays, merchantId, privateKey, boldIdentityKey, boldSecretKey, epaycoPublicKey, epaycoPrivateKey, epaycoServiceCode, redirectUrl } = form;
 
   const hasConfiguredSecrets = initialConfig?.hasConfiguredSecrets === true;
 
@@ -274,6 +287,15 @@ export default function BillingConfigForm({
           );
           return;
         }
+      } else if (gatewayProvider === "EPAYCO") {
+        if (!epaycoPublicKey.trim()) {
+          setValidationError("Ingresa el Public Key de ePayco.");
+          return;
+        }
+        if (!hasConfiguredSecrets && !epaycoPrivateKey.trim()) {
+          setValidationError("Ingresa el Private Key de ePayco.");
+          return;
+        }
       }
     }
 
@@ -307,6 +329,15 @@ export default function BillingConfigForm({
         : undefined,
       boldSecretKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "BOLD"
         ? (boldSecretKey.trim() || (hasConfiguredSecrets ? REDACTED : undefined))
+        : undefined,
+      epaycoPublicKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "EPAYCO"
+        ? epaycoPublicKey.trim() || undefined
+        : undefined,
+      epaycoPrivateKey: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "EPAYCO"
+        ? (epaycoPrivateKey.trim() || (hasConfiguredSecrets ? REDACTED : undefined))
+        : undefined,
+      epaycoServiceCode: paymentMode === "PAYMENT_GATEWAY" && gatewayProvider === "EPAYCO"
+        ? epaycoServiceCode.trim() || undefined
         : undefined,
       redirectPaymentUrl:
         paymentMode === "REDIRECT_LINK" ? redirectUrl.trim() : undefined,
@@ -498,7 +529,7 @@ export default function BillingConfigForm({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => setGatewayProvider("PLACETOPAY")}
@@ -552,6 +583,34 @@ export default function BillingConfigForm({
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     Pagos con link de pago, datáfono y transferencias.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGatewayProvider("EPAYCO")}
+                  disabled={isSaving}
+                  className={`
+                    relative text-left p-4 rounded-lg border-2 transition-all duration-200
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                    ${isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:shadow-sm"}
+                    ${
+                      gatewayProvider === "EPAYCO"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-blue-300"
+                    }
+                  `}
+                >
+                  {gatewayProvider === "EPAYCO" && (
+                    <span className="absolute top-2 right-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    </span>
+                  )}
+                  <p className={`font-semibold text-sm ${gatewayProvider === "EPAYCO" ? "text-blue-700" : "text-gray-800"}`}>
+                    ePayco
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Pagos con PSE Multicrédito, tarjetas y transferencias.
                   </p>
                 </button>
               </div>
@@ -639,6 +698,79 @@ export default function BillingConfigForm({
                   <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                   Las claves son almacenadas de forma cifrada. Puedes obtenerlas en
                   el panel de desarrolladores de BOLD.
+                </p>
+              </div>
+            )}
+
+            {/* ePayco credentials */}
+            {gatewayProvider === "EPAYCO" && (
+              <div className="p-6 bg-gray-50 border border-gray-200 rounded-xl space-y-5">
+                <div className="flex items-center gap-2 mb-1">
+                  <CreditCard className="w-4 h-4 text-blue-600" />
+                  <p className="text-sm font-semibold text-gray-800">
+                    Credenciales de ePayco
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="epaycoPublicKey"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Public Key
+                  </label>
+                  <input
+                    id="epaycoPublicKey"
+                    type="text"
+                    value={epaycoPublicKey ?? ""}
+                    onChange={(e) => setEpaycoPublicKey(e.target.value)}
+                    placeholder="Ingresa el Public Key de ePayco"
+                    disabled={isSaving}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm
+                      focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition
+                      disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                </div>
+
+                <PasswordInput
+                  id="epaycoPrivateKey"
+                  label="Private Key"
+                  value={epaycoPrivateKey ?? ""}
+                  onChange={setEpaycoPrivateKey}
+                  placeholder="Clave privada de ePayco"
+                  disabled={isSaving}
+                  hasExistingValue={hasConfiguredSecrets}
+                />
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="epaycoServiceCode"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Código de Servicio PSE Multicrédito
+                    <span className="ml-1 text-xs font-normal text-gray-400">(opcional)</span>
+                  </label>
+                  <input
+                    id="epaycoServiceCode"
+                    type="text"
+                    value={epaycoServiceCode ?? ""}
+                    onChange={(e) => setEpaycoServiceCode(e.target.value)}
+                    placeholder="Ej. 1234 — asignado por ePayco para el complejo"
+                    disabled={isSaving}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm
+                      focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition
+                      disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Requerido solo si usas PSE Multicrédito. ePayco lo asigna
+                    por complejo residencial al activar el servicio.
+                  </p>
+                </div>
+
+                <p className="text-xs text-gray-500 flex items-start gap-1.5 pt-1">
+                  <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Las claves son almacenadas de forma cifrada. Puedes obtenerlas en
+                  el panel de administración de ePayco.
                 </p>
               </div>
             )}

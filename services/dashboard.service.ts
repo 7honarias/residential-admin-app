@@ -69,7 +69,6 @@ export const getDashboardData = async (
 ): Promise<DashboardData> => {
   try {
     const url = `${API_URL}/getDashboardData?complexId=${complexId}`;
-    console.log("Fetching dashboard data from:", url);
 
     const response = await fetch(url, {
       method: "GET",
@@ -79,15 +78,10 @@ export const getDashboardData = async (
       },
     });
 
-    console.log("Response status:", response.status);
-    console.log("Response headers:", {
-      contentType: response.headers.get("content-type"),
-      contentLength: response.headers.get("content-length"),
-    });
+    
 
     // Obtener el texto primero para debugging
     const text = await response.text();
-    console.log("Response text:", text.substring(0, 500)); // Primeros 500 chars
 
     if (!response.ok) {
       let errorMessage = "Error al cargar datos del dashboard";
@@ -106,7 +100,6 @@ export const getDashboardData = async (
     }
 
     const data: DashboardData = JSON.parse(text);
-    console.log("Dashboard data parsed successfully:", data);
     return data;
   } catch (error) {
     const errorMessage =

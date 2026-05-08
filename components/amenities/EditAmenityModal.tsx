@@ -201,14 +201,11 @@ export default function EditAmenityModal({
       // Convertir a número los campos numéricos
       if (name === "capacity" || name === "slot_duration" || name === "max_slots_per_reservation") {
         newValue = value === "" ? 0 : Math.max(1, parseInt(value, 10));
-        console.log(`${name} changed:`, value, "->", newValue);
       } else if (name === "price") {
         newValue = value === "" ? 0 : Math.max(0, parseFloat(value));
-        console.log(`${name} changed:`, value, "->", newValue);
       }
 
       const updated = { ...prev, [name]: newValue };
-      console.log("FormData actualizado:", updated);
       return updated;
     });
   };

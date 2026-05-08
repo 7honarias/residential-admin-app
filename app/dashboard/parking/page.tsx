@@ -82,7 +82,6 @@ export default function ParkingManagementPage() {
       
       const result = await bulkLoadParkings(activeComplex.id, mappedRows, token);
       
-      console.log("Carga exitosa:", result);
       alert(`¡Éxito! Se procesaron ${result.parkings_processed} parqueaderos.`);
       fetchParkings();
       

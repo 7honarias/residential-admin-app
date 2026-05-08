@@ -68,7 +68,6 @@ export default function EditOwnerModal({
   };
 
   const handleSubmit = async () => {
-    console.log("[EditOwnerModal] handleSubmit called, form:", form);
     if (!form.documentNumber.trim()) {
       setError("El número de documento es requerido");
       return;

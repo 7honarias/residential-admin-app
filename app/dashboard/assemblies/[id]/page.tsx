@@ -197,7 +197,6 @@ export default function AssemblyRoomPage() {
         },
       )
       .subscribe((status) => {
-        console.log(`[Realtime] poll_votes canal status:`, status);
         setIsRealtimeConnected(status === "SUBSCRIBED");
       });
 

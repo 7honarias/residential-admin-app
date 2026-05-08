@@ -26,7 +26,6 @@ export const UpdateOwner = async (
     email: form.email,
     phone: form.phone,
   };
-  console.log("[UpdateOwner] payload:", payload);
   const response = await fetch(
     `${API_URL}/assignApartmentOwner?${params.toString()}`,
     {

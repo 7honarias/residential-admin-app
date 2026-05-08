@@ -57,6 +57,12 @@ export const mockDashboardData: DashboardData = {
       { b: "Bloque C", o: 28, d: 2 },
       { b: "Bloque D", o: 34, d: 1 },
     ],
+    delinquencyAging: [
+      { range: "1-30 días", apartments: 8, amount: 24000, fill: "#f59e0b" },
+      { range: "31-60 días", apartments: 3, amount: 9500, fill: "#f97316" },
+      { range: "61-90 días", apartments: 1, amount: 3200, fill: "#ef4444" },
+      { range: "+90 días", apartments: 0, amount: 0, fill: "#7f1d1d" },
+    ],
   },
   lastUpdate: new Date().toISOString(),
 };
