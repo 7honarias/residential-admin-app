@@ -3,8 +3,8 @@
 Version: 1.0  
 Fecha de entrada en vigor: 10 de abril de 2026  
 Titular de la plataforma: Vestap  
-NIT: Pendiente de asignacion  
-Correo de contacto legal: 7honarias@gmail.com  
+NIT: 902063869-5
+Correo de contacto legal: soporte@vestap.net 
 Pais de operacion principal: Colombia
 
 ## 1. Identificacion del proveedor y aceptacion
@@ -186,9 +186,9 @@ Cualquier controversia que no pueda resolverse de forma directa entre las partes
 
 Para solicitudes legales, soporte contractual o notificaciones relacionadas con estos Terminos:
 
-- Correo: 7honarias@gmail.com
+- Correo: soporte@vestap.net
 - Titular: Vestap
-- NIT: Pendiente de asignacion
+- NIT: 902063869-5
 
 ## 21. Clausulas especiales para entorno residencial
 

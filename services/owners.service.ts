@@ -18,14 +18,6 @@ export const UpdateOwner = async (
   }
 
   const params = new URLSearchParams({ complexId });
-  const payload = {
-    apartmentId,
-    fullName: form.fullName,
-    documentTypeCode: form.documentType,
-    documentNumber: form.documentNumber,
-    email: form.email,
-    phone: form.phone,
-  };
   const response = await fetch(
     `${API_URL}/assignApartmentOwner?${params.toString()}`,
     {

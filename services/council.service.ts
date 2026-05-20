@@ -50,6 +50,28 @@ export const fetchCouncilOwners = async (
   return data?.owners || [];
 };
 
+export const fetchCurrentCouncilMembers = async (
+  token: string,
+  complexId: string,
+): Promise<CouncilOwner[]> => {
+  const params = new URLSearchParams({ complexId });
+  const response = await fetch(`${API_URL}/getCouncilOwners?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = (await response.json().catch(() => null)) as ListCouncilOwnersResponse | null;
+
+  if (!response.ok) {
+    throw new Error(data?.message || "No fue posible cargar los miembros del consejo.");
+  }
+
+  return data?.owners || [];
+};
+
 export const assignCouncilMembers = async (
   token: string,
   complexId: string,

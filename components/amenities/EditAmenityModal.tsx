@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   X,
   Loader,
@@ -351,10 +352,11 @@ export default function EditAmenityModal({
               {imageUrl ? (
                 <div className="space-y-3">
                   <div className="relative h-44 w-full overflow-hidden rounded-xl border border-slate-200 bg-white">
-                    <img
+                    <Image
                       src={imageUrl}
                       alt="Vista previa de la imagen del amenity"
-                      className="h-full w-full object-cover"
+                      fill
+                      className="object-cover"
                     />
                     <button
                       type="button"

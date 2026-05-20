@@ -89,7 +89,7 @@ export default function TermsAndConditionsPage() {
       <section className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-4xl flex-col gap-4 px-6 py-8 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
           <p>
-            Contacto legal: 7honarias@gmail.com | NIT: pendiente de asignacion
+            Contacto legal: soporte@vestap.net | NIT: 902063869-5
           </p>
           <div className="flex items-center gap-4">
             <Link

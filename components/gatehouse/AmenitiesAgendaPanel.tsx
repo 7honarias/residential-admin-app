@@ -372,7 +372,11 @@ export default function AmenitiesAgendaPanel({
           )}
 
           {filteredBookings.map((booking) => {
-            const status = statusStyles[booking.status];
+            const status = statusStyles[booking.status] ?? {
+              label: booking.status,
+              className: "bg-slate-100 text-slate-600 border-slate-200",
+              accent: "text-slate-500",
+            };
 
             return (
               <article

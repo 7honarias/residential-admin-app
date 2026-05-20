@@ -39,7 +39,7 @@ const policyItems = [
   {
     title: "Canal de contacto",
     content:
-      "Puedes escribir a 7honarias@gmail.com para consultas, peticiones, quejas o reclamos sobre tratamiento de datos.",
+      "Puedes escribir a soporte@vestap.net para consultas, peticiones, quejas o reclamos sobre tratamiento de datos.",
   },
 ];
 
@@ -84,8 +84,7 @@ export default function DataPolicyPage() {
       <section className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-4xl flex-col gap-3 px-6 py-8 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
           <p>
-            Contacto de datos personales: 7honarias@gmail.com | NIT: pendiente de
-            asignacion
+            Contacto de datos personales: soporte@vestap.net | NIT: 902063869-5
           </p>
           <div className="flex items-center gap-4">
             <Link

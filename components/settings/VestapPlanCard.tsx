@@ -41,9 +41,13 @@ export default function VestapPlanCard({
       }`}
     >
       {/* ── Recommended banner ── */}
-      {plan.is_recommended && (
+      {plan.is_recommended ? (
         <div className="bg-indigo-600 text-white text-xs font-bold text-center py-1.5 tracking-wider uppercase">
           ⭐ Más popular
+        </div>
+      ) : (
+        <div className="bg-indigo-600 text-white text-xs font-bold text-center py-1.5 tracking-wider uppercase">
+          &nbsp;
         </div>
       )}
 
@@ -63,14 +67,12 @@ export default function VestapPlanCard({
           <span className="inline-block text-xs font-semibold text-indigo-500 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full mb-2">
             {cycleTag}
           </span>
-          <h3 className="text-lg font-bold text-slate-900 leading-tight pr-16">
+          <h3 className="text-lg font-bold text-slate-900 leading-tight pr-16 h-10">
             {plan.name}
           </h3>
-          {plan.description && (
-            <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-              {plan.description}
-            </p>
-          )}
+          <p className="mt-1.5 text-xs text-slate-500 leading-relaxed h-15">
+            {plan.description || ""}
+          </p>
         </div>
 
         {/* ── Price ── */}

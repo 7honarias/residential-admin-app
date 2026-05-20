@@ -4,7 +4,7 @@ Version: 1.0
 Fecha de entrada en vigor: 10 de abril de 2026  
 Responsable del tratamiento: Vestap  
 NIT: Pendiente de asignacion  
-Correo de contacto: 7honarias@gmail.com  
+Correo de contacto: soporte@vestap.net  
 Ambito territorial principal: Colombia
 
 ## 1. Objeto
@@ -27,7 +27,7 @@ Vestap tratara datos personales de conformidad con la normativa colombiana vigen
 
 Vestap, como responsable del tratamiento en los escenarios que corresponda y/o encargado frente a datos gestionados por conjuntos clientes, dispone del siguiente canal para consultas, peticiones, quejas o reclamos relacionados con datos personales:
 
-- Correo: 7honarias@gmail.com
+- Correo: soporte@vestap.net
 
 ## 5. Datos personales que podemos tratar
 
@@ -130,7 +130,7 @@ Las modificaciones se informaran por canales razonables y su version vigente est
 ## 16. Contacto
 
 - Responsable: Vestap
-- Correo: 7honarias@gmail.com
+- Correo: soporte@vestap.net
 - NIT: Pendiente de asignacion
 
 ---
