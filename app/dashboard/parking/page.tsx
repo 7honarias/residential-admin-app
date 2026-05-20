@@ -72,7 +72,7 @@ export default function ParkingManagementPage() {
 
   const handleImportSubmit = async (mappedRows: any[]) => {
     try {
-      setIsUploading(true);
+      setIsLoading(true);
       
       if (!activeComplex || !token) {
         alert("Error: No hay un complejo activo seleccionado o token no disponible.");
@@ -87,7 +87,7 @@ export default function ParkingManagementPage() {
     } catch (error: any) {
       alert(`Hubo un error: ${error.message}`);
     } finally {
-      setIsUploading(false);
+      setIsLoading(false);
     }
   };
 
