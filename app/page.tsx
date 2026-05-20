@@ -3,71 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import ContactForm from "@/components/contact/ContactForm";
-import { useAppSelector } from "@/store/hooks";
+import { getRecentPosts } from "@/lib/blog-posts";
+import Navbar from "@/components/Navbar";
 
 export default function LandingPage() {
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
-  const isAdmin = isAuthenticated && user?.role === "ADMIN";
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-200">
-      {/* 1. NAVBAR - Minimalista y limpia */}
-      <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-200/50">
-        <div className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
-          <Link href="/" className="shrink-0" aria-label="Ir al inicio">
-            <Image
-              src="/logo-web-transparent.png"
-              alt="Vestap"
-              width={170}
-              height={48}
-              className="h-10 w-auto object-contain"
-              priority
-            />
-          </Link>
-          <div className="hidden md:flex gap-8 font-medium text-slate-600 text-sm">
-            <Link
-              href="#nosotros"
-              className="hover:text-indigo-600 transition-colors"
-            >
-              Nosotros
-            </Link>
-            <Link
-              href="#features"
-              className="hover:text-indigo-600 transition-colors"
-            >
-              Módulos
-            </Link>
-            <Link
-              href="#contact"
-              className="hover:text-indigo-600 transition-colors"
-            >
-              Contacto
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
-            {isAdmin ? (
-              <Link
-                href="/dashboard"
-                className="hidden md:block text-sm font-semibold text-slate-600 hover:text-slate-900 transition"
-              >
-                Ir al Dashboard
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="hidden md:block text-sm font-semibold text-slate-600 hover:text-slate-900 transition"
-              >
-                Iniciar Sesión
-              </Link>
-            )}
-            <Link
-              href="#contact"
-              className="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-full hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-600/20 transition-all active:scale-95"
-            >
-              Agendar Demo
-            </Link>
-          </div>
-        </div>
-      </nav>
+      {/* 1. NAVBAR */}
+      <Navbar />
 
       {/* 2. HERO SECTION - Elegante y directo al punto */}
       <section className="relative pt-40 pb-20 md:pt-48 md:pb-32 px-6 text-center overflow-hidden">
@@ -257,6 +200,64 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* 3.8 BLOG PREVIEW */}
+      {(() => {
+        const posts = getRecentPosts(3);
+        return (
+          <section className="py-24 bg-white border-y border-slate-100">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="text-center mb-14">
+                <span className="inline-block text-sm font-bold tracking-widest text-indigo-600 uppercase mb-3">
+                  Recursos Gratuitos
+                </span>
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 tracking-tight">
+                  Aprende sobre Propiedad Horizontal
+                </h2>
+                <p className="text-slate-500 max-w-xl mx-auto text-lg">
+                  Guías y normativa para administradores, contadores y consejos
+                  de administración en Colombia.
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6 mb-10">
+                {posts.map((post) => (
+                  <Link
+                    key={post.slug}
+                    href={`/blog/${post.slug}`}
+                    className="group block bg-slate-50 border border-slate-100 rounded-2xl p-7 hover:shadow-lg hover:border-indigo-200 transition-all duration-300"
+                  >
+                    <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full">
+                      {post.category}
+                    </span>
+                    <h3 className="text-base font-bold text-slate-800 mt-4 mb-2 group-hover:text-indigo-600 transition-colors leading-snug line-clamp-3">
+                      {post.title}
+                    </h3>
+                    <p className="text-slate-500 text-sm leading-relaxed line-clamp-2 mb-4">
+                      {post.excerpt}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">{post.readTime}</span>
+                      <span className="text-indigo-600 text-sm font-medium group-hover:underline">
+                        Leer →
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              <div className="text-center">
+                <Link
+                  href="/blog"
+                  className="inline-block px-8 py-3 border-2 border-indigo-600 text-indigo-600 font-semibold rounded-full hover:bg-indigo-600 hover:text-white transition-all"
+                >
+                  Ver todos los artículos
+                </Link>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* 4. CONTACTO - El embudo de conversión (Formulario B2B) */}
       <section
