@@ -25,6 +25,7 @@ export const toggleAttendance = async (
     is_proxy: boolean; 
     attendee_name?: string; 
     attendee_document?: string;
+    grantor_document?: string;
     can_vote?: boolean;
   }
 ) => {

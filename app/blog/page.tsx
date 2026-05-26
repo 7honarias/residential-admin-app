@@ -20,19 +20,19 @@ export const metadata: Metadata = {
     description:
       "Recursos profesionales para la gestión de copropiedades y conjuntos residenciales en Colombia.",
     type: "website",
-    url: "https://vestap.co/blog",
+    url: "https://vestap.net/blog",
     locale: "es_CO",
   },
   alternates: {
-    canonical: "https://vestap.co/blog",
+    canonical: "https://vestap.net/blog",
   },
 };
 
 const categoryColors: Record<string, string> = {
   "Marco Legal": "bg-indigo-100 text-indigo-700",
-  "Gestión": "bg-emerald-100 text-emerald-700",
-  "Asambleas": "bg-purple-100 text-purple-700",
-  "Finanzas": "bg-emerald-100 text-emerald-700",
+  Gestión: "bg-emerald-100 text-emerald-700",
+  Asambleas: "bg-purple-100 text-purple-700",
+  Finanzas: "bg-emerald-100 text-emerald-700",
   "Gobierno Corporativo": "bg-purple-100 text-purple-700",
 };
 

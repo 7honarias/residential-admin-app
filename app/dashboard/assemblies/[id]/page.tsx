@@ -28,6 +28,7 @@ import {
   Wifi,
 } from "lucide-react";
 
+import { QRCodeSVG } from "qrcode.react";
 import CreatePollModal from "@/components/assemblies/CreatePollModal";
 import FinalizeAssemblyModal from "@/components/assemblies/FinalizeAssemblyModal";
 import { supabase } from "@/lib/supabaseClient";
@@ -81,10 +82,14 @@ export default function AssemblyRoomPage() {
   const [isProxy, setIsProxy] = useState(false);
   const [proxyName, setProxyName] = useState("");
   const [proxyId, setProxyId] = useState("");
+  const [grantorId, setGrantorId] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState(false);
 
   // --- ESTADO DEL MODAL DE FINALIZACIÓN ---
   const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
+
+  // --- ESTADOS DE REGISTRO POR QR ---
+  const [qrRegistrations, setQrRegistrations] = useState<any[]>([]);
 
   // --- ESTADOS DE GRABACIÓN ---
   type RecordingPhase = "IDLE" | "SOUND_TEST" | "READY" | "RECORDING" | "DONE";
@@ -129,6 +134,19 @@ export default function AssemblyRoomPage() {
     }
   }, [token, activeComplex?.id, assemblyId, router]);
 
+  const loadQrRegistrations = useCallback(async () => {
+    if (!assemblyId) return;
+    const { data } = await supabase
+      .from("assembly_attendance")
+      .select(
+        "id, attendee_name, registration_source, check_in_time, apartments ( number, blocks ( name ) )"
+      )
+      .eq("assembly_id", assemblyId)
+      .eq("registration_source", "qr_registration_desk")
+      .order("check_in_time", { ascending: false });
+    if (data) setQrRegistrations(data);
+  }, [assemblyId]);
+
   const loadAttendance = useCallback(async () => {
     try {
       setIsLoadingAttendance(true);
@@ -158,8 +176,34 @@ export default function AssemblyRoomPage() {
   useEffect(() => {
     if (activeTab === "ATTENDANCE") {
       loadAttendance();
+      loadQrRegistrations();
     }
-  }, [activeTab, loadAttendance]);
+  }, [activeTab, loadAttendance, loadQrRegistrations]);
+
+  // Suscripción en tiempo real para registros por QR
+  useEffect(() => {
+    if (!assemblyId) return;
+    const channel = supabase
+      .channel(`qr-registrations-${assemblyId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "assembly_attendance",
+          filter: `assembly_id=eq.${assemblyId}`,
+        },
+        (payload) => {
+          if ((payload.new as any)?.registration_source === "qr_registration_desk") {
+            loadQrRegistrations();
+            loadAttendance();
+            loadDataRef.current?.();
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [assemblyId, loadQrRegistrations, loadAttendance]);
 
   // Limpia micrófono y timer si el usuario navega fuera de la página
   useEffect(() => {
@@ -260,9 +304,10 @@ export default function AssemblyRoomPage() {
       
       // AHORA SIEMPRE ENVIAMOS EL NOMBRE Y LA CÉDULA
       const attendanceData = { 
-        is_proxy: isProxy, // Manda true o false dependiendo del checkbox
+        is_proxy: isProxy,
         attendee_name: proxyName, 
         attendee_document: proxyId,
+        ...(isProxy && grantorId ? { grantor_document: grantorId } : {}),
         can_vote: true
       };
 
@@ -288,6 +333,7 @@ export default function AssemblyRoomPage() {
       setIsProxy(false);
       setProxyName("");
       setProxyId("");
+      setGrantorId("");
       
       // 4. RECARGAMOS LOS DATOS GLOBALES
       await loadData();
@@ -307,6 +353,7 @@ export default function AssemblyRoomPage() {
     setIsProxy(false);
     setProxyName("");
     setProxyId("");
+    setGrantorId("");
   };
 
   // ==========================================
@@ -371,6 +418,11 @@ export default function AssemblyRoomPage() {
         payload: { assembly_id: assembly.id, status: newStatus },
       });
       await loadData();
+      // Si se abrió el registro, ir directamente a la pestaña de Asistencia
+      // para que el admin vea el QR de inmediato.
+      if (newStatus === "REGISTRATION_OPEN") {
+        setActiveTab("ATTENDANCE");
+      }
     } catch (error: any) {
       alert(`Error al avanzar la asamblea: ${error.message}`);
     } finally {
@@ -850,8 +902,13 @@ export default function AssemblyRoomPage() {
                             <span>
                               {option.percentage}%{" "}
                               <span className="text-slate-400 font-medium text-xs ml-1">
-                                ({option.votes} votos)
+                                ({option.votes} {option.votes === 1 ? "voto" : "votos"})
                               </span>
+                              {option.coefficient_weight != null && option.coefficient_weight > 0 && (
+                                <span className="text-indigo-500 font-medium text-xs ml-1" title="Peso ponderado por coeficiente">
+                                  · {option.coefficient_weight} coef.
+                                </span>
+                              )}
                             </span>
                           </div>
                           <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -870,6 +927,52 @@ export default function AssemblyRoomPage() {
                           </div>
                         </div>
                       ))}
+
+                      {/* Footer: participación y coeficiente */}
+                      {(() => {
+                        const totalVotesCast = poll.options.reduce(
+                          (sum: number, opt: any) => sum + (opt.votes || 0),
+                          0
+                        );
+                        const coefVotedPercent =
+                          assembly.quorum_percentage > 0
+                            ? Math.round(
+                                (poll.total_weight / assembly.quorum_percentage) * 1000
+                              ) / 10
+                            : 0;
+                        return (
+                          <div className="pt-3 mt-1 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                            {/* Personas que han votado */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+                                <Users className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="text-xs text-slate-500">
+                                  <span className="font-bold text-slate-800">{totalVotesCast}</span>
+                                  {" "}
+                                  <span className="text-slate-400">de</span>
+                                  {" "}
+                                  <span className="font-bold text-slate-800">{assembly.voters_eligible_count ?? assembly.attendees_count}</span>
+                                  {" "}han votado
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* % de coeficiente que ha participado */}
+                            <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-1">
+                              <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
+                              <span className="text-xs text-slate-500">
+                                Coef. participado:{" "}
+                                <span className={`font-bold ${coefVotedPercent >= 50 ? "text-emerald-600" : "text-indigo-600"}`}>
+                                  {coefVotedPercent}%
+                                </span>
+                                <span className="text-slate-400 ml-1">
+                                  ({poll.total_weight ?? 0} / {assembly.quorum_percentage})
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 ))
@@ -1034,7 +1137,92 @@ export default function AssemblyRoomPage() {
 
           {/* 4. PESTAÑA DE ASISTENCIA */}
           {activeTab === "ATTENDANCE" && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[600px] animate-in fade-in duration-300">
+            <div className="space-y-5 animate-in fade-in duration-300">
+
+              {/* --- BLOQUE QR DE REGISTRO PRESENCIAL --- */}
+              {(assembly.status === "REGISTRATION_OPEN" || assembly.status === "IN_PROGRESS") && (
+                <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden">
+                  <div className="p-5 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-black text-indigo-900 text-sm flex items-center gap-2">
+                        <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                        QR de Registro Presencial
+                      </h3>
+                      <p className="text-xs text-indigo-700 mt-0.5">
+                        Muestra este QR en la mesa. El propietario lo escanea desde la app y queda inscrito automáticamente.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold bg-indigo-600 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
+                      ACTIVO
+                    </span>
+                  </div>
+
+                  <div className="p-6 flex flex-col md:flex-row gap-6 items-center">
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center gap-3 shrink-0">
+                      <div className="bg-white border-4 border-indigo-100 rounded-2xl p-4 shadow-inner">
+                        <QRCodeSVG
+                          value={`vestap://assembly/${assemblyId}/scan`}
+                          size={180}
+                          fgColor="#1e1b4b"
+                          bgColor="#ffffff"
+                          level="M"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium text-center">
+                        Escanear con la app Vestap
+                      </p>
+                    </div>
+
+                    {/* Lista en tiempo real */}
+                    <div className="flex-1 w-full">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                          Registrados por QR ({qrRegistrations.length})
+                        </h4>
+                        <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+                          <Wifi className="w-3 h-3" /> Tiempo real
+                        </span>
+                      </div>
+                      {qrRegistrations.length === 0 ? (
+                        <div className="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-200 rounded-xl">
+                          Aún nadie se ha registrado por QR. Esperando escaneos…
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                          {qrRegistrations.map((reg) => {
+                            const aptData = Array.isArray(reg.apartments) ? reg.apartments[0] : reg.apartments;
+                            const blockData = Array.isArray(aptData?.blocks) ? aptData.blocks[0] : aptData?.blocks;
+                            const tower = blockData?.name ?? "";
+                            const aptNumber = aptData?.number ?? "";
+                            const time = reg.check_in_time
+                              ? new Date(reg.check_in_time).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
+                              : "";
+                            return (
+                              <div
+                                key={reg.id}
+                                className="flex items-center gap-3 px-3 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl"
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-bold text-slate-800 truncate">{reg.attendee_name}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {tower ? `${tower} — ` : ""}Apto {aptNumber}
+                                  </p>
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-400 shrink-0">{time}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- LISTA DE ASISTENCIA MANUAL --- */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[520px]">
               <div className="p-5 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex gap-3">
                 <div className="relative flex-1">
                   <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1059,6 +1247,7 @@ export default function AssemblyRoomPage() {
                       <tr className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-400">
                         <th className="p-4 font-bold">Unidad</th>
                         <th className="p-4 font-bold">Coeficiente</th>
+                        <th className="p-4 font-bold">Otros Coef.</th>
                         <th className="p-4 font-bold">Estado</th>
                         <th className="p-4 font-bold text-right">Acción</th>
                       </tr>
@@ -1074,7 +1263,20 @@ export default function AssemblyRoomPage() {
                               ?.toLowerCase()
                               .includes(searchApt.toLowerCase()),
                         )
-                        .map((apt) => (
+                        .map((apt) => {
+                          const otherCoef =
+                            !apt.covered_by_primary_apt &&
+                            apt.total_coefficient != null &&
+                            apt.coefficient != null
+                              ? Number(
+                                  (
+                                    Number(apt.total_coefficient) -
+                                    Number(apt.coefficient)
+                                  ).toFixed(4),
+                                )
+                              : null;
+
+                          return (
                           <tr
                             key={apt.apartment_id}
                             className="hover:bg-slate-50 transition-colors"
@@ -1086,7 +1288,47 @@ export default function AssemblyRoomPage() {
                               </p>
                             </td>
                             <td className="p-4 text-sm font-medium text-slate-600">
-                              {apt.coefficient}%
+                              {apt.total_coefficient != null ? (
+                                <span className="font-bold text-indigo-700" title="Coeficiente acumulado (apts + parqueaderos del propietario)">
+                                  {apt.total_coefficient}%
+                                </span>
+                              ) : (
+                                <span>{apt.coefficient ?? "—"}%</span>
+                              )}
+                              {apt.covered_by_primary_apt && (
+                                <span className="ml-1.5 text-xs text-indigo-400" title="Cubierto por el registro del propietario">(owner)</span>
+                              )}
+                            </td>
+                            <td className="p-4 text-sm">
+                              {apt.covered_by_primary_apt ? (
+                                <span className="text-xs text-slate-300 italic">—</span>
+                              ) : apt.other_properties && apt.other_properties.length > 0 ? (
+                                <div className="flex flex-col gap-0.5">
+                                  {(apt.other_properties as { type: string; unit: string; coefficient: number }[]).map(
+                                    (op, i) => (
+                                      <span
+                                        key={i}
+                                        className={`text-xs font-medium ${op.type === "PARKING" ? "text-violet-600" : "text-sky-600"}`}
+                                        title={op.type === "PARKING" ? `Parqueadero ${op.unit}` : `Apartamento ${op.unit}`}
+                                      >
+                                        {op.type === "PARKING" ? "🅿" : "🏢"} {op.unit}: {op.coefficient}%
+                                      </span>
+                                    ),
+                                  )}
+                                </div>
+                              ) : otherCoef != null && otherCoef > 0 ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <span
+                                    className="font-semibold text-violet-600"
+                                    title="Coeficiente de parqueaderos y/o bodegas del propietario"
+                                  >
+                                    +{otherCoef}%
+                                  </span>
+                                  <span className="text-xs text-slate-400">parq/bod</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-300">—</span>
+                              )}
                             </td>
                             <td className="p-4">
                               <span
@@ -1122,11 +1364,13 @@ export default function AssemblyRoomPage() {
                               )}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                     </tbody>
                   </table>
                 )}
               </div>
+            </div>
             </div>
           )}
 
@@ -1353,6 +1597,43 @@ export default function AssemblyRoomPage() {
             </div>
           </div>
 
+          {/* --- QR VISIBLE EN COLUMNA DERECHA (solo cuando registro abierto) --- */}
+          {assembly.status === "REGISTRATION_OPEN" && (
+            <div className="bg-white rounded-2xl border-2 border-indigo-200 shadow-sm overflow-hidden">
+              <div className="p-4 bg-indigo-600 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black text-white uppercase tracking-wide flex items-center gap-2">
+                    <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                    QR Registro Presencial
+                  </p>
+                  <p className="text-[10px] text-indigo-200 mt-0.5">
+                    Muestra en la mesa de registro
+                  </p>
+                </div>
+              </div>
+              <div className="p-4 flex flex-col items-center gap-3">
+                <div className="bg-white border-4 border-indigo-100 rounded-xl p-3 shadow-inner">
+                  <QRCodeSVG
+                    value={`vestap://assembly/${assemblyId}/scan`}
+                    size={140}
+                    fgColor="#1e1b4b"
+                    bgColor="#ffffff"
+                    level="M"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 font-medium text-center">
+                  vestap://assembly/{assemblyId}/scan
+                </p>
+                <button
+                  onClick={() => setActiveTab("ATTENDANCE")}
+                  className="text-xs font-bold text-indigo-600 hover:underline"
+                >
+                  Ver registrados →
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="bg-slate-900 rounded-2xl p-6 shadow-lg text-white sticky top-[300px] z-10">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
               <Settings className="w-4 h-4" /> Control del Evento
@@ -1440,20 +1721,20 @@ export default function AssemblyRoomPage() {
               <div className="space-y-4 animate-in slide-in-from-top-2">
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">
-                    Nombre
+                    {isProxy ? "Nombre del Apoderado" : "Nombre"}
                   </label>
                   <input
                     type="text"
                     required
                     value={proxyName}
                     onChange={(e) => setProxyName(e.target.value)}
-                    placeholder="Ej: Carlos Pérez"
+                    placeholder={isProxy ? "Ej: Carlos Pérez" : "Ej: Juan García"}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">
-                    Cédula
+                    {isProxy ? "Cédula del Apoderado" : "Cédula"}
                   </label>
                   <input
                     type="text"
@@ -1464,6 +1745,25 @@ export default function AssemblyRoomPage() {
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
+
+                {isProxy && (
+                  <div className="space-y-1.5 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <label className="text-sm font-bold text-amber-800">
+                      Cédula del Propietario (Poderdante)
+                    </label>
+                    <p className="text-xs text-amber-600 mb-2">
+                      Ingresa el número de cédula del propietario que autorizó el poder.
+                    </p>
+                    <input
+                      type="text"
+                      required={isProxy}
+                      value={grantorId}
+                      onChange={(e) => setGrantorId(e.target.value)}
+                      placeholder="Ej: 9876543210"
+                      className="w-full px-4 py-3 bg-white border border-amber-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-slate-100">

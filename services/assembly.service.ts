@@ -34,6 +34,7 @@ export interface AssemblyDetailResponse {
     scheduled_for: string;
     quorum_percentage: number;
     attendees_count: number;
+    voters_eligible_count: number;
     address?: string;
     start_date?: string;
     end_date?: string;
