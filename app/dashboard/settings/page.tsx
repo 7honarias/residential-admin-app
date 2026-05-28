@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppSelector } from "@/store/hooks";
-import { AlertCircle, Save, Loader, Settings, Receipt, ShieldCheck, CreditCard } from "lucide-react";
+import { AlertCircle, Save, Loader, Settings, Receipt, ShieldCheck, CreditCard, TrendingUp } from "lucide-react";
 import CoefficientPricingTable from "@/components/settings/CoefficientPricingTable";
 import FinancialSettingsForm from "@/components/settings/FinancialSettingsForm";
 import BillingConfigForm, { BillingConfig as BillingConfigFormData } from "@/components/settings/BillingConfigForm";
 import MfaSetup from "@/components/settings/MfaSetup";
+import BudgetTab from "@/components/settings/BudgetTab";
 import {
   fetchFinancialSettings,
   updateFinancialSettings,
@@ -18,7 +19,7 @@ import {
   BillingConfig,
 } from "@/services/settings.service";
 
-type ActiveTab = "administration" | "billing" | "security";
+type ActiveTab = "administration" | "billing" | "security" | "budget";
 
 export default function SettingsPage() {
   const { activeComplex } = useAppSelector((state) => state.complex);
@@ -175,6 +176,23 @@ export default function SettingsPage() {
             Facturación
           </button>
 
+          {/* TAB: PRESUPUESTO */}
+          <button
+            onClick={() => {
+              setActiveTab("budget");
+              setError(null);
+              setSuccess(null);
+            }}
+            className={`flex items-center gap-2 px-6 py-4 font-medium border-b-2 transition-colors ${
+              activeTab === "budget"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <TrendingUp className="w-5 h-5" />
+            Presupuesto
+          </button>
+
           {/* TAB: SEGURIDAD */}
           <button
             onClick={() => {
@@ -253,6 +271,19 @@ export default function SettingsPage() {
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* CONTENIDO TAB PRESUPUESTO */}
+              {activeTab === "budget" && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-1">Presupuesto de la Copropiedad</h2>
+                    <p className="text-gray-600 text-sm">
+                      Carga el presupuesto anual aprobado en asamblea. Este valor se usa para calcular las cuotas de administración de cada inmueble.
+                    </p>
+                  </div>
+                  <BudgetTab token={token} complexId={activeComplex.id} />
                 </div>
               )}
 

@@ -11,10 +11,11 @@ interface ChangeTypeModalProps {
 }
 
 const PARKING_TYPES = [
-  { value: "RESIDENT", label: "Residente" },
+  { value: "PRIVATE", label: "Privado" },
   { value: "VISITOR", label: "Visitante" },
   { value: "SERVICE", label: "Servicio" },
   { value: "DISABLED", label: "Deshabilitado" },
+  { value: "COMMON", label: "Común" },
 ];
 
 export default function ChangeTypeModal({ onClose, onSave, isProcessing, currentType }: ChangeTypeModalProps) {

@@ -480,7 +480,7 @@ export default function FinalizeAssemblyModal({
         startDate: assembly.start_date,
         endDate: assembly.end_date,
         address: assembly.address,
-        quorumPercentage: assembly.quorum_percentage,
+        quorumPercentage: assembly.quorum_percentage * 100,
         attendeesCount: assembly.attendees_count,
         agenda,
         polls,

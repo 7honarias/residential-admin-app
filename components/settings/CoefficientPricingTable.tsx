@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Loader, Plus, X, AlertCircle } from "lucide-react";
+import { Loader, Plus, X, AlertCircle, Info } from "lucide-react";
 import { createCoefficientPricing, getCoefficientPricingList, updateSingleCoefficientPricing, type CoefficientPricing } from "@/services/settings.service";
 
 export interface CoefficientPricingTableProps {
@@ -20,16 +20,16 @@ export default function CoefficientPricingTable({
   const [editingCoefficient, setEditingCoefficient] = useState<CoefficientPricing | null>(null);
   const [newCoefficient, setNewCoefficient] = useState("");
   const [newMeters, setNewMeters] = useState("");
-  const [newPrice, setNewPrice] = useState("");
   const [addingCoefficient, setAddingCoefficient] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [coefficients, setCoefficients] = useState<CoefficientPricing[]>([]);
   const [loadingCoefficients, setLoadingCoefficients] = useState(false);
+  const [budgetAvailable, setBudgetAvailable] = useState(true);
 
 
   const handleAddCoefficient = async () => {
-    if (!newCoefficient.trim() || !newPrice.trim()) {
-      setAddError("Por favor completa los campos obligatorios");
+    if (!newCoefficient.trim()) {
+      setAddError("Por favor ingresa el coeficiente");
       return;
     }
 
@@ -43,10 +43,9 @@ export default function CoefficientPricingTable({
 
     try {
       const coefficient = parseFloat(newCoefficient);
-      const price = parseFloat(newPrice);
       const meters = newMeters ? parseFloat(newMeters) : undefined;
 
-      if (isNaN(coefficient) || isNaN(price)) {
+      if (isNaN(coefficient)) {
         throw new Error("Los valores numéricos no son válidos");
       }
 
@@ -58,7 +57,6 @@ export default function CoefficientPricingTable({
           pricingId: editingCoefficient.id,
           coefficient,
           meters,
-          price,
         });
         
         setShowEditModal(false);
@@ -70,7 +68,6 @@ export default function CoefficientPricingTable({
           complexId,
           coefficient,
           meters,
-          price,
         });
 
         setShowAddModal(false);
@@ -78,7 +75,6 @@ export default function CoefficientPricingTable({
 
       setNewCoefficient("");
       setNewMeters("");
-      setNewPrice("");
       
       // Reload coefficients list
       await loadCoefficients();
@@ -104,6 +100,8 @@ export default function CoefficientPricingTable({
         complexId,
       });
       setCoefficients(data);
+      // Si el primer registro indica que no hay presupuesto, mostrar aviso
+      setBudgetAvailable(data.length === 0 || data[0]?.budget_available !== false);
     } catch (error) {
       console.error("Error loading coefficients:", error);
     } finally {
@@ -124,7 +122,6 @@ export default function CoefficientPricingTable({
           onClick={() => {
             setNewCoefficient("");
             setNewMeters("");
-            setNewPrice("");
             setAddError(null);
             setShowAddModal(true);
           }}
@@ -134,6 +131,16 @@ export default function CoefficientPricingTable({
           Agregar Coeficiente
         </button>
       </div>
+
+      {/* Aviso cuando no hay presupuesto cargado para el mes */}
+      {!budgetAvailable && coefficients.length > 0 && (
+        <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <Info className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600" />
+          <span>
+            No hay presupuesto registrado para el mes en curso. Las cuotas mostradas son <strong>$0</strong> hasta que el administrador cargue el presupuesto mensual.
+          </span>
+        </div>
+      )}
 
       {/* Coefficients Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -147,7 +154,8 @@ export default function CoefficientPricingTable({
                 Metros de Referencia
               </th>
               <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
-                Precio Administración
+                Cuota Mensual
+                <span className="block text-xs font-normal text-gray-500">coef × presupuesto</span>
               </th>
               <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
                 Acciones
@@ -171,10 +179,14 @@ export default function CoefficientPricingTable({
                     {row.meters > 0 ? `${row.meters}m²` : "—"}
                   </td>
                   <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">
-                    ${row.price.toLocaleString("es-CO", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {row.budget_available === false ? (
+                      <span className="text-amber-600 font-normal text-xs">Sin presupuesto</span>
+                    ) : (
+                      `$${row.cuota_mensual.toLocaleString("es-CO", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <button
@@ -182,7 +194,6 @@ export default function CoefficientPricingTable({
                         setEditingCoefficient(row);
                         setNewCoefficient(row.coefficient.toString());
                         setNewMeters(row.meters.toString());
-                        setNewPrice(row.price.toString());
                         setAddError(null);
                         setShowEditModal(true);
                       }}
@@ -211,7 +222,6 @@ export default function CoefficientPricingTable({
                   setShowAddModal(false);
                   setNewCoefficient("");
                   setNewMeters("");
-                  setNewPrice("");
                   setAddError(null);
                 }}
                 disabled={addingCoefficient}
@@ -265,25 +275,13 @@ export default function CoefficientPricingTable({
                 <p className="text-xs text-gray-500 mt-1">Área promedio de apartamentos con este coeficiente</p>
               </div>
 
-              <div>
-                <label htmlFor="add-price" className="block text-sm font-medium text-gray-700 mb-1">
-                  Precio de Administración *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-2.5 text-gray-500 font-medium">$</span>
-                  <input
-                    id="add-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Ej: 250000"
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    disabled={addingCoefficient}
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Precio mensual de administración</p>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs font-medium text-blue-800">Cuota mensual calculada automáticamente</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  La cuota de administración se calcula como:<br/>
+                  <strong>coeficiente × presupuesto mensual del conjunto</strong><br/>
+                  Carga el presupuesto mensual en la sección de Finanzas para que aparezca el valor.
+                </p>
               </div>
             </div>
 
@@ -293,7 +291,6 @@ export default function CoefficientPricingTable({
                   setShowAddModal(false);
                   setNewCoefficient("");
                   setNewMeters("");
-                  setNewPrice("");
                   setAddError(null);
                 }}
                 disabled={addingCoefficient}
@@ -332,7 +329,6 @@ export default function CoefficientPricingTable({
                   setEditingCoefficient(null);
                   setNewCoefficient("");
                   setNewMeters("");
-                  setNewPrice("");
                   setAddError(null);
                 }}
                 disabled={addingCoefficient}
@@ -383,24 +379,17 @@ export default function CoefficientPricingTable({
                 <p className="text-xs text-gray-500 mt-1">Área promedio de apartamentos con este coeficiente</p>
               </div>
 
-              <div>
-                <label htmlFor="edit-price" className="block text-sm font-medium text-gray-700 mb-1">
-                  Precio de Administración *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-2.5 text-gray-500 font-medium">$</span>
-                  <input
-                    id="edit-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    disabled={addingCoefficient}
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Precio mensual de administración</p>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs font-medium text-blue-800">Cuota calculada automáticamente</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Cuota actual: <strong>
+                    {editingCoefficient?.budget_available === false
+                      ? "Sin presupuesto"
+                      : `$${editingCoefficient?.cuota_mensual?.toLocaleString("es-CO", { minimumFractionDigits: 2 }) ?? "—"}`
+                    }
+                  </strong><br/>
+                  El valor se recalcula automáticamente cuando cambia el presupuesto mensual.
+                </p>
               </div>
             </div>
 
@@ -411,7 +400,6 @@ export default function CoefficientPricingTable({
                   setEditingCoefficient(null);
                   setNewCoefficient("");
                   setNewMeters("");
-                  setNewPrice("");
                   setAddError(null);
                 }}
                 disabled={addingCoefficient}

@@ -1270,8 +1270,8 @@ export default function AssemblyRoomPage() {
                             apt.coefficient != null
                               ? Number(
                                   (
-                                    Number(apt.total_coefficient) -
-                                    Number(apt.coefficient)
+                                    (Number(apt.total_coefficient) -
+                                    Number(apt.coefficient)) * 100
                                   ).toFixed(4),
                                 )
                               : null;
@@ -1290,10 +1290,10 @@ export default function AssemblyRoomPage() {
                             <td className="p-4 text-sm font-medium text-slate-600">
                               {apt.total_coefficient != null ? (
                                 <span className="font-bold text-indigo-700" title="Coeficiente acumulado (apts + parqueaderos del propietario)">
-                                  {apt.total_coefficient}%
+                                  {Number((Number(apt.total_coefficient) * 100).toFixed(4))}%
                                 </span>
                               ) : (
-                                <span>{apt.coefficient ?? "—"}%</span>
+                                <span>{apt.coefficient != null ? Number((Number(apt.coefficient) * 100).toFixed(4)) : "—"}%</span>
                               )}
                               {apt.covered_by_primary_apt && (
                                 <span className="ml-1.5 text-xs text-indigo-400" title="Cubierto por el registro del propietario">(owner)</span>
@@ -1311,7 +1311,7 @@ export default function AssemblyRoomPage() {
                                         className={`text-xs font-medium ${op.type === "PARKING" ? "text-violet-600" : "text-sky-600"}`}
                                         title={op.type === "PARKING" ? `Parqueadero ${op.unit}` : `Apartamento ${op.unit}`}
                                       >
-                                        {op.type === "PARKING" ? "🅿" : "🏢"} {op.unit}: {op.coefficient}%
+                                        {op.type === "PARKING" ? "🅿" : "🏢"} {op.unit}: {Number((op.coefficient * 100).toFixed(4))}%
                                       </span>
                                     ),
                                   )}
@@ -1551,22 +1551,22 @@ export default function AssemblyRoomPage() {
 
             <div className="flex items-end gap-2 mb-2">
               <span
-                className={`text-5xl font-black tracking-tight ${assembly.quorum_percentage >= 50 ? "text-emerald-600" : "text-amber-500"}`}
+                className={`text-5xl font-black tracking-tight ${assembly.quorum_percentage >= 0.5 ? "text-emerald-600" : "text-amber-500"}`}
               >
-                {assembly.quorum_percentage}%
+                {(assembly.quorum_percentage * 100).toFixed(1)}%
               </span>
             </div>
 
             <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden mb-3 relative">
               <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-slate-300 z-10" />
               <div
-                className={`h-full transition-all duration-1000 relative z-0 ${assembly.quorum_percentage >= 50 ? "bg-emerald-500" : "bg-amber-400"}`}
-                style={{ width: `${assembly.quorum_percentage}%` }}
+                className={`h-full transition-all duration-1000 relative z-0 ${assembly.quorum_percentage >= 0.5 ? "bg-emerald-500" : "bg-amber-400"}`}
+                style={{ width: `${Math.min(assembly.quorum_percentage * 100, 100)}%` }}
               />
             </div>
 
             <p className="text-sm font-bold text-slate-600 flex items-center gap-1.5">
-              {assembly.quorum_percentage >= 50 ? (
+              {assembly.quorum_percentage >= 0.5 ? (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Quórum
                   Legal Alcanzado

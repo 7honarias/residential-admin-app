@@ -226,14 +226,23 @@ export const updateApartmentAdminCosts = async (
 };
 
 /**
- * Interface for Coefficient Pricing configuration
+ * Interface for Coefficient Pricing configuration.
+ * `price` fue eliminado de la tabla: la cuota se calcula dinámicamente
+ * como coefficient × complex_budget.total_amount del período en curso.
  */
 export interface CoefficientPricing {
   id: string;
   complex_id: string;
   coefficient: number;
   meters: number;
-  price: number;
+  /** Cuota calculada: coefficient × presupuesto_mensual. Solo lectura. */
+  cuota_mensual: number;
+  /** Año del presupuesto usado para el cálculo. */
+  budget_year?: number;
+  /** Mes del presupuesto usado para el cálculo. */
+  budget_month?: number;
+  /** false cuando no hay presupuesto cargado para el período actual. */
+  budget_available?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -243,7 +252,7 @@ export interface CreateCoefficientPricingParams {
   complexId: string;
   coefficient: number;
   meters?: number;
-  price: number;
+  // price eliminado: se calcula a partir del presupuesto mensual
 }
 
 export interface UpdateCoefficientPricingParams {
@@ -251,7 +260,7 @@ export interface UpdateCoefficientPricingParams {
   complexId: string;
   pricings: Array<{
     id: string;
-    price: number;
+    // price eliminado
     meters?: number;
   }>;
 }
@@ -341,7 +350,7 @@ export const createCoefficientPricing = async (
         body: JSON.stringify({
           coefficient: params.coefficient,
           meters: params.meters || 0,
-          price: params.price,
+          // price ya no se envía: se calcula desde el presupuesto mensual
         }),
       }
     );
@@ -401,7 +410,7 @@ export interface UpdateSingleCoefficientPricingParams {
   pricingId: string;
   coefficient: number;
   meters?: number;
-  price: number;
+  // price eliminado: se calcula desde el presupuesto mensual
 }
 
 export const updateSingleCoefficientPricing = async (
@@ -419,7 +428,7 @@ export const updateSingleCoefficientPricing = async (
         body: JSON.stringify({
           coefficient: params.coefficient,
           meters: params.meters || 0,
-          price: params.price,
+          // price ya no se envía
         }),
       }
     );

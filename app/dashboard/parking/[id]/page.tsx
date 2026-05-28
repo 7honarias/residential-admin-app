@@ -488,6 +488,7 @@ export default function ParkingDetailPage() {
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {parking.coefficientPricing.meters} m²
                       </td>
+                      {/* Formateamos el precio a moneda local sin decimales
                       <td className="px-6 py-4 text-sm font-semibold text-slate-800">
                         {new Intl.NumberFormat("es-CO", {
                           style: "currency",
@@ -495,6 +496,7 @@ export default function ParkingDetailPage() {
                           minimumFractionDigits: 0,
                         }).format(parking.coefficientPricing.price)}
                       </td>
+                       */}
                     </tr>
                   </tbody>
                 </table>
