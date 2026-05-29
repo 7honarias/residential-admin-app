@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { X, Loader } from "lucide-react";
-import { getCoefficientPricingList } from "@/services/settings.service";
-import { CoefficientPricing } from "@/app/dashboard/apartments/apartment.types";
+import { getCoefficientPricingList, CoefficientPricing } from "@/services/settings.service";
 
 interface SelectCoefficientModalProps {
   isOpen: boolean;
@@ -126,7 +125,7 @@ export default function SelectCoefficientModal({
                         Coeficiente: {coeff.coefficient.toFixed(4)}
                       </p>
                       <p className="text-sm text-slate-600 mt-1">
-                        Área: {coeff.meters} m² | Precio: {formatCurrency(coeff.price)}
+                        Área: {coeff.meters} m² | Precio: {formatCurrency(coeff.cuota_mensual)}
                       </p>
                     </div>
                     {selectedId === coeff.id && selecting && (

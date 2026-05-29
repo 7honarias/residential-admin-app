@@ -8,7 +8,7 @@ import { useAppSelector } from "@/store/hooks";
 import { fetchApartments, assignCoefficientPricingToApartment } from "@/services/apartments.service";
 import UploadApartmentsModal from "@/components/apartments/UploadApartmentsModal";
 import SelectCoefficientModal from "@/components/apartments/SelectCoefficientModal";
-import { CoefficientPricing } from "@/app/dashboard/apartments/apartment.types";
+import { CoefficientPricing } from "@/services/settings.service";
 import { useRouter } from "next/navigation";
 
 interface Block {

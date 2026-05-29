@@ -21,6 +21,7 @@ const pageTitle: Record<string, string> = {
   "/dashboard/posts": "Publicaciones",
   "/dashboard/assemblies": "Asambleas",
   "/dashboard/settings": "Configuración",
+  "/dashboard/reports": "Informes IA",
 };
 
 function getPageTitle(pathname: string): string {

@@ -25,7 +25,8 @@ import EditOwnerModal from "@/components/apartments/EditOwnerModal";
 import { UpdateOwner, DeleteOwner } from "@/services/owners.service";
 import AddResidentModal from "@/components/apartments/AddResidentModal";
 import SelectCoefficientModal from "@/components/apartments/SelectCoefficientModal";
-import { Resident, CoefficientPricing, Invoice } from "../apartment.types";
+import { Resident, Invoice } from "../apartment.types";
+import { CoefficientPricing } from "@/services/settings.service";
 import { addResident, removeResident } from "@/services/resident.service";
 import {
   assignCoefficientPricingToApartment,

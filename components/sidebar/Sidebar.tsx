@@ -8,7 +8,7 @@ import {
   Home, Building2, Coffee, Settings, LogOut, Car, 
   Users, MessageSquare, Bell, Package, DollarSign, Receipt,
   ChevronDown, ChevronRight, X, UserCog, Newspaper, 
-  CreditCard
+  CreditCard, FileText
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
@@ -47,6 +47,12 @@ const menuGroups = [
       { name: "Publicaciones", icon: Newspaper, href: "/dashboard/posts" },
       { name: "Zonas Comunes", icon: Coffee, href: "/dashboard/amenities" },
       { name: "Asambleas", icon: Users, href: "/dashboard/assemblies" },
+    ]
+  },
+  {
+    label: "Inteligencia",
+    items: [
+      { name: "Informes IA", icon: FileText, href: "/dashboard/reports" },
     ]
   },
   {
