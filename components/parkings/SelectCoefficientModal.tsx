@@ -16,11 +16,11 @@ interface SelectCoefficientModalProps {
   isProcessing: boolean;
 }
 
-const CURRENCY_FORMATTER = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  minimumFractionDigits: 0,
-});
+// const CURRENCY_FORMATTER = new Intl.NumberFormat("es-CO", {
+//   style: "currency",
+//   currency: "COP",
+//   minimumFractionDigits: 0,
+// });
 
 export default function SelectCoefficientModal({
   isOpen,
@@ -155,10 +155,10 @@ export default function SelectCoefficientModal({
                       <p className="font-semibold text-slate-800">
                         Coeficiente: {coeff.coefficient.toFixed(4)}
                       </p>
-                      <p className="text-sm text-slate-600 mt-1">
+                      {/* <p className="text-sm text-slate-600 mt-1">
                         Área: {coeff.meters} m² | Precio:{" "}
                         {CURRENCY_FORMATTER.format(coeff.price)}
-                      </p>
+                      </p> */}
                     </div>
                     {selectedId === coeff.id && selecting && (
                       <Loader className="w-4 h-4 text-indigo-600 animate-spin" />

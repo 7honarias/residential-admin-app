@@ -212,13 +212,6 @@ interface ReportDetailPanelProps {
 }
 
 function ReportDetailPanel({ report, onClose }: ReportDetailPanelProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
-
   useEffect(() => {
     if (report) {
       document.body.style.overflow = "hidden";
@@ -241,7 +234,7 @@ function ReportDetailPanel({ report, onClose }: ReportDetailPanelProps) {
     URL.revokeObjectURL(url);
   };
 
-  if (!mounted || !report) return null;
+  if (!report) return null;
 
   const config = TYPE_CONFIG[report.type] ?? TYPE_CONFIG.GENERAL;
   const Icon = config.icon;
